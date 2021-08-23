@@ -11,7 +11,7 @@ int main(int argc, char **argv){
     int k, dim, i;
     char *fname, *goal, buffer[MAXLEN], *ev;
     FILE *file;
-    double **data, **Adjacency, **DiagMat, **laplacian, **jacobi, **u;
+    double **data, **Adjacency, **DiagMat, **laplacian, **jacobi, **u, **t;
     // Read User Data
     k = atoi(argv[1]);
     goal = argv[2];
@@ -47,30 +47,87 @@ int main(int argc, char **argv){
     }
     // Determine K
     ev = (double**)malloc(dim*sizeof(double*));
+    assert(ev != NULL);
     for (i = 0; i < dim; i++)
     {
         ev[i] = (double*)malloc(2 * sizeof(double));
+        assert(ev[i] != NULL);
         ev[i] = {jacobi[i][i], i};
     }
     qsort(ev, dim, sizeof(double), cmp);
     if (k == 0){
         k = eigengap(ev);
     }
-    BuildU(dim, k, jacobi, u);
+    BuildU(dim, k, jacobi, u, ev);
+    // Build T (normalized by line)
+    BuildT(dim, k, u, t);
+    
 	return 0;
 }
 
-void BuildU(int dim, int k, double** jac, double** u){
-    u = (double**) malloc(k * sizeof(double*));
-
+void BuildT(int dim, int k, double** u, double** t){
+    int i, j;
+    double lineSums[dim];
+    double sum = 0.0;
+    t = (double**) malloc(dim * sizeof(double*));
+    assert(t != NULL);
+    for(i = 0; i < dim ; i++){
+        sum = 0.0;
+        for (j = 0; j < k; j++)
+        {
+            sum += pow(u[i][j], 2.0);
+        }
+        lineSums[i] = sqrt(sum);
+    }
+    for (i = 0; i < dim; i++)
+    {
+        t[i] = (double*) malloc(k * sizeof(double));
+        assert(t[i] != NULL);
+        for (j = 0; j < k; j++)
+        {
+            t[i][j] = u[i][j]/lineSums[i];
+        }
+    }
 }
 
-int eigengap(int dim, double* eigenVals){
+void BuildU(int dim, int k, double** jac, double** u, double** eigenVals){
+    int i, j;
+    u = (double**) malloc(k * sizeof(double*));
+    assert(u != NULL);
+    transpose(dim, dim, jac);
+    for (i = 0; i < k; i++)
+    {
+        u[i] = (double*) malloc(dim* sizeof(double));
+        assert(u[i] != NULL);
+        for (j = 0; j < dim; j++)
+        {
+            u[i] = jac[i];
+        }
+    }
+    transpose(k, dim, u);
+}
+
+void transpose(int up, int side, double** mat){
+    double** temp;
+    int k,m;
+    temp = (double**) malloc(side * sizeof(double*));
+    assert(temp != NULL);
+    for(k = 0; k< side; k++){
+        temp[k] = (double*) malloc(up*sizeof(double));
+        assert(temp[k] != NULL);
+        for(m = 0; m < up; m++){
+            temp[k][m] = mat[m][k];
+        }
+    }
+    mat = temp;
+}
+
+int eigengap(int dim, double** eigenVals){
     double diffs[dim-1], maxAbs;
     int i, max_i;
     for (i = 0; i < dim-1; i++)
     {
-        diffs[i] = abs(eigenVals[i] - eigenVals[i+1]);
+        diffs[i] = abs(eigenVals[i][0] - eigenVals[i+1][0]);
         if (diffs[i] > maxAbs)
         {
             maxAbs = diffs[i];
@@ -82,9 +139,9 @@ int eigengap(int dim, double* eigenVals){
 
 int cmp(const void *x, const void *y)
 {
-  double xx = *(double*)x, yy = *(double*)y;
-  if (xx < yy) return -1;
-  if (xx > yy) return  1;
+  double dx = *(double*)x, dy = *(double*)y;
+  if (dx < dy) return -1;
+  if (dx > dy) return  1;
   return 0;
 }
 
@@ -105,6 +162,7 @@ double* diagonal(double** mat, int dim){
     int i, j;
     double* res;
     res = (double*)malloc(dim * sizeof(double));
+    assert(res !- NULL);
     for (i = 0; i < dim; i++)
     {
         res[i] = mat[i][i];   
@@ -121,9 +179,11 @@ double*** BuildJacobi(int dim, double** mat){
     p = buildID(dim);
     limiter = 5 * pow(dim,2);
     jacobi = (double**) malloc(dim*sizeof(double*));
+    assert(jacobi != NULL);
     for (k = 0; k < dim; k++)
     {
         jacobi[k] = (double*) malloc(dim*sizeof(double));
+        assert(jacobi[k] != NULL);
     }
     for (k = 0; k < limiter; k++)
     {
@@ -142,9 +202,11 @@ double*** BuildJacobi(int dim, double** mat){
 double** buildID(int N){
     double** ID;
     ID = (double**)malloc(dim*sizeof(double*));
+    assert(ID !- NULL);
     for(i = 0; i < dim; i++){
-        Id[i] = (double*)calloc(dim, sizeof(double));
-        Id[i][i] = 1.0;
+        ID[i] = (double*)calloc(dim, sizeof(double));
+        assert(ID[i] != NULL);
+        ID[i][i] = 1.0;
     }
     return ID;
 }
@@ -275,8 +337,10 @@ double** BuildDDG(double** Adj, int dim){
     double **diag;
     double sumline;
     diag = (double**)malloc(dim * sizeof(double*));
+    assert(diag != NULL);
     for(i=0; i < dim; i++){
         diag[i] = (double*)malloc(dim * sizeof(double));
+        assert(diag[i] != NULL);
         sumline = 0;
         for(j = 0; j <= dim; j++){
             sumline += Adj[i][j];
@@ -293,8 +357,10 @@ double** WAMatrix(double** data, int dim){
     int i = 0, j;
     double **AdMat;
     AdMat = (double**)malloc(dim * sizeof(double *));
+    assert(AdMat != NULL);
     for(i=0; i < dim; i++){
         AdMat[i] = (double*)malloc(dim * sizeof(double));
+        assert(AdMat[i] != NULL);
         for(j = 0; j <= i; j++){
             if (i == j)
             {
@@ -336,7 +402,8 @@ double** read_csv_file(char *filename){
     }
 
     while ((read = getline (&buffer, &len, fp)) != -1) {
-        array[idx] = malloc (sizeof (array));
+        array[idx] = (double*)malloc (sizeof (array));
+        assert(array[idx] != NULL);
         for (j = 0, ptr = buffer; j < MAXLEN; j++, ptr++)
             array [idx][j] = (double)strtol(ptr, &ptr, 10);
         idx++;
