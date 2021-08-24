@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+from numpy.random import rand
 import pandas as pd
 from enum import Enum, auto, unique
 
@@ -10,24 +11,41 @@ def main():
     k = sys.argv[1]
     goal = sys.argv[2]
     filelines = pd.read_csv(sys.argv[3]).astype('float64')
+    # Interface with C
+    dim = filelines.shape[0]
+    Wam = spkmeans.WAMatrix(filelines, dim)
+    if goal == 'wam':
+        print(Wam)
+        return
+    ddg = spkmeans.BuildDDG(Wam, dim)
+    if goal == 'ddg':
+        print(ddg)
+        return
+    lap = spkmeans.BuildLap(ddg, Wam, dim)
+    if goal == 'lnorm':
+        print(lap)
+        return
+    jacobi = spkmeans.BuildJacobi(dim, lap)
+    if goal == 'jacobi':
+        print(jacobi)
+        return
+    ev = [jacobi[i][i] for i in range(len(jacobi))]
+    # determine K (if 0 use heuristic)
+    if k == 0:
+        k = spkmeans.eigengap(dim, ev)
     # Calculate Centroids as in HW2
     centr_inf = centroids_init(filelines, k)
     centr_indx = centr_inf[1]
     centroids = centr_inf[0]
-    # Interface with C
+    # build U and T
+    
+    
+    
 
     #Output
     if goal == 'spk':
         print(centr_indx)
         print(centroids)
-    elif goal == 'wam':
-        return
-    elif goal == 'ddg':
-        return
-    elif goal == 'lnorm':
-        return
-    elif goal == 'jacobi':
-        return
 
     return None
 
@@ -48,7 +66,7 @@ def centroids_init(data, k):
         dist_sq = np.array([min([np.inner(cent-x,cent-x) for cent in centroids]) for x in data])
         probs = dist_sq/dist_sq.sum()
         accum_probs = probs.cumsum()
-        r = np.random.rand()
+        r = np.random.choice(accum_probs)
         for j, p in enumerate(accum_probs):
             if r < p:
                 i = j
