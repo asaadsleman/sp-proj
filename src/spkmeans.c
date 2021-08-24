@@ -3,6 +3,9 @@
 #include <string.h>
 #include <math.h>
 #include <sys/types.h>
+#include <spkmeans.h>
+
+
 
 #define MAXLEN 1000
 #define EPS 0.001
@@ -61,7 +64,9 @@ int main(int argc, char **argv){
     BuildU(dim, k, jacobi, u, ev);
     // Build T (normalized by line)
     BuildT(dim, k, u, t);
-    
+    // Cluster into Kmeans
+    // TBD
+
 	return 0;
 }
 
