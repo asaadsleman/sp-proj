@@ -6,7 +6,10 @@
 #include <sys/types.h>
 #include "spkmeans.h"
 
+/* some pre processing defs */
+
 #define MAXLEN 1000
+#define MAXWID 100
 #define EPS 1e-15
 
 
@@ -14,7 +17,7 @@
 int main(int argc, char **argv){
     int k, dim, i;
     char *fname, *goal;
-    double **data, **Adjacency, **DiagMat, **laplacian, **jacobi, **u, **t, **ev;
+    double **Adjacency, **DiagMat, **laplacian, **jacobi, **u, **t, **ev;
     double *data[MAXLEN];
     if(argc < 4){
         printf("not enough parameters");
@@ -25,14 +28,16 @@ int main(int argc, char **argv){
     goal = argv[2];
     fname = argv[3];
     /* Read File */
-    read_csv_file(fname, data);
-    dim = sizeof(data) / sizeof(double *);
-    Adjacency = WAMatrix(data, dim);
+    data = (double**)malloc(MAXLEN * sizeof(double*));
+    assert(data);
+    dim = read_csv_file(fname, &data);
+    Adjacency = WAMatrix(&data, dim);
     if (strcmp(goal, "wam"))
     {
+        print_mat(&Adjacency, dim);
         return 1;
     }
-    DiagMat = BuildDDG(Adjacency, dim);
+    /* DiagMat = BuildDDG(Adjacency, dim);
     if(strcmp(goal, "ddg")){
         return 2;
     }
@@ -58,10 +63,24 @@ int main(int argc, char **argv){
     if (k == 0){
         k = eigengap(dim, ev);
     }
-    BuildU(dim, k, jacobi, u, ev);
+    u = (double**)malloc(dim * sizeof(double*));
+    assert(u);
+    BuildU(dim, k, jacobi, u);
+    t = (double**)malloc(dim * sizeof(double*));
+    assert(t);
     BuildT(dim, k, u, t);
+    */
 
 	return 0;
+}
+
+void print_mat(double** mat, int dim){
+    int i, j;
+    for (i = 0; i < m; i++){
+        for (j = 0; j < N; j++)
+        printf("%d ", arr[i][j]);
+        printf("\n");
+    }
 }
 
 void BuildT(int dim, int k, double** u, double** t){
@@ -92,7 +111,7 @@ void BuildT(int dim, int k, double** u, double** t){
     free(lineSums);
 }
 
-void BuildU(int dim, int k, double** jac, double** u, double** eigVSrtd){
+void BuildU(int dim, int k, double** jac, double** u){
     int i, j;
     u = (double**) malloc(k * sizeof(double*));
     assert(u);
@@ -150,16 +169,16 @@ int cmp(const void *x, const void *y)
   return 0;
 }
 
-void correctMat(int dim,double** mat1, double** mat2, double **final){
+void correctMat(int dim, double* arr, double** mat, double **final){
     int i, j;
     for (i = 0; i < dim; i++)
     {
         for (j = 0; j < i; j++)
         {
-            final[i][j] = mat2[i][j];
+            final[i][j] = mat[i][j];
             final[j][i] = final[i][j];
         }
-        final[i][i] = mat1[i][i];
+        final[i][i] = arr[i];
     }
 }
 
@@ -178,22 +197,27 @@ double* diagonal(double** mat, int dim){
 
 double** BuildJacobi(int dim, double** mat){
     double* max;
-    double** p, **diag, **jacobi;
-    int limiter, i, j, k;
-    p = buildID(dim);
-    limiter = 5 * pow(dim,2);
+    double** p, *diag, **jacobi;
+    int i, j, k;
+    i = 0;
+    j = 0;
+    p = (double**)malloc(dim * sizeof(double*));
+    assert(p);
+    buildID(dim, p);
     jacobi = (double**) malloc(dim*sizeof(double*));
-    assert(jacobi != NULL);
+    assert(jacobi);
+    diag = (double*) malloc(dim * sizeof(double));
+    assert(diag);
     for (k = 0; k < dim; k++)
     {
         jacobi[k] = (double*) malloc(dim*sizeof(double));
         assert(jacobi[k] != NULL);
     }
-    for (k = 0; k < limiter; k++)
+    for (k = 0; k < 100; k++)
     {
         max = offElem(dim, mat);
         if(max[0] < EPS){
-            *diag = diagonal(mat, dim);
+            diag = diagonal(mat, dim);
             correctMat(dim, diag, p, jacobi);
             return jacobi;
         }
@@ -203,17 +227,15 @@ double** BuildJacobi(int dim, double** mat){
     return NULL;
 }
 
-double** buildID(int N){
+void buildID(int N, double** res){
     int i;
-    double** ID;
-    ID = (double**)malloc(N*sizeof(double*));
-    assert(ID);
+    res = (double**)malloc(N*sizeof(double*));
+    assert(res);
     for(i = 0; i < N; i++){
-        ID[i] = (double*)calloc(N, sizeof(double));
-        assert(ID[i] != NULL);
-        ID[i][i] = 1.0;
+        res[i] = (double*)calloc(N, sizeof(double));
+        assert(res[i] != NULL);
+        res[i][i] = 1.0;
     }
-    return ID;
 }
 
 double* offElem(int dim, double** mat){
@@ -308,10 +330,21 @@ void rotate(int dim, double** p, double** mat, int i, int j){
 double** BuildLap(double** Diag, double** Adj, int dim){
     double **Laplacian, **Id;
     double **Mid, **Mid2;
-    Id = buildID(dim);
-    Mid = multiply(dim, Diag, Adj);
-    Mid2 = multiply(dim, Mid, Diag);
+    Laplacian = (double**)malloc(dim * sizeof(double*));
+    assert(Laplacian);
+    Id = (double**)malloc(dim * sizeof(double*));
+    assert(Id);
+    Mid = (double**)malloc(dim * sizeof(double*));
+    assert(Mid);
+    Mid2 = (double**)malloc(dim * sizeof(double*));
+    assert(Mid2);
+    buildID(dim, Id);
+    multiply(dim, Diag, Adj, Mid);
+    multiply(dim, Mid, Diag, Mid2);
     subtract(dim, Id, Mid2, Laplacian);
+    free(Id);
+    free(Mid2);
+    free(Mid);
     return Laplacian;
 
 }
@@ -326,8 +359,7 @@ void subtract(int dim, double** A, double** B, double** res){
 }
 }
 
-double** multiply(int dim, double** A, double** B){
-    double **res;
+void multiply(int dim, double** A, double** B, double** res){
     int i, j, k;
     res = (double**)malloc(dim * sizeof(double*));
     assert(res);
@@ -396,29 +428,44 @@ double CalcWeight(double* point1, double* point2){
     return exp(-dis_sq/2);
 }
 
-void read_csv_file(char *filename, double** array){
-    int idx = 0;
-    int j = 0;
-    char *buffer = NULL;
-    size_t len = 0;
-    ssize_t read;
-    char *ptr = NULL;
-
+int read_csv_file(char *filename, double** data){
+    int row = 0;
+    int col = 0;
+    int colCount = 0;
+    double elem = 0.0;
+    char buffer[MAXWID];
     FILE *fp;
+
     fp = fopen (filename, "r");
     if (!fp) {
         fprintf (stderr, "failed to open file for reading\n");
         exit(-1);
     }
 
-    while ((read = getline(&buffer, &len, fp)) != -1) {
-        array[idx] = (double*)malloc (sizeof (array));
-        assert(array[idx]);
-        for (j = 0, ptr = buffer; j < MAXLEN; j++, ptr++){
-            array [idx][j] = (double)strtol(ptr, &ptr, 10);
+    while (fgets(buffer, MAXWID, fp)) {
+            /* first line */
+            if(row == 0){
+                char* cntr = strtok(buffer, ", ");
+                while (cntr) {
+                value = strtok(NULL, ", ");
+                colCount++;
+                }
+            }
+            col = 0;
+            row++;
+            data = (double**)realloc(data, row * sizeof(double*));
+            assert(data);
+            data[row-1] = (double*)malloc(colCount * sizeof(double));
+            assert(data[row-1]);
+            /* Splitting the data */
+            char* value = strtok(buffer, ", ");
+            while (value) {
+                elem = atof(value);
+                data[row-1][col] = elem;
+                value = strtok(NULL, ", ");
+                col++;
+            }
         }
-        idx++;
-    }
-
-    fclose (fp);
+        fclose(fp);
+        return row;
 }
