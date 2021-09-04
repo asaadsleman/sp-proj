@@ -15,9 +15,8 @@
 
 
 int main(int argc, char **argv){
-    int dim, cols; /*, k, i;
-    char *fname, *goal;*/
-    char *fname;
+    int dim, cols; /*, k, i;*/
+    char *fname, *goal;
     double **data, **Adjacency; /* **DiagMat, **laplacian, **jacobi, **u, **t, **ev; */
     if(argc < 4){
         printf("not enough parameters");
@@ -25,8 +24,8 @@ int main(int argc, char **argv){
     }
     /* Read User Data
     k = atoi(argv[1]);
-    goal = argv[2];
     */
+    goal = argv[2];
     fname = argv[3];
     /*Read File */
     /* get dims of data*/
@@ -35,15 +34,14 @@ int main(int argc, char **argv){
     data = (double**)malloc(dim * sizeof(double*));
     assert(data);
     init_data_rows(data, dim, cols);
-    read_csv_file(fname, data);
+    read_csv_file(fname, data);printf("%s\n", goal);
     Adjacency = (double**)malloc(dim * sizeof(double*));
     assert(Adjacency);
     init_data_rows(Adjacency, dim, dim);
     WAMatrix(data, dim, Adjacency);
-    if (strcmp(goal, "wam"))
-    {
+    if(strcmp(goal, "wam") == 0){
         print_mat(Adjacency, dim, dim);
-        return 1;
+        return 2;
     }
     /*
     DiagMat = BuildDDG(Adjacency, dim);
@@ -464,7 +462,7 @@ void WAMatrix(double** data, int dim, double** adj){
         for(j = 0; j <= i; j++){
             if (i == j)
             {
-                AdMat[i][i] = 0;
+                adj[i][i] = 0;
                 continue;
             }
             adj[i][j] = CalcWeight(data[i], data[j]);
