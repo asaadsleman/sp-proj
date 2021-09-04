@@ -17,7 +17,7 @@
 int main(int argc, char **argv){
     int dim, cols; /*, k, i;*/
     char *fname, *goal;
-    double **data, **Adjacency; /* **DiagMat, **laplacian, **jacobi, **u, **t, **ev; */
+    double **data, **Adjacency, **DiagMat; /*, **laplacian, **jacobi, **u, **t, **ev; */
     if(argc < 4){
         printf("not enough parameters");
         return -1;
@@ -34,7 +34,7 @@ int main(int argc, char **argv){
     data = (double**)malloc(dim * sizeof(double*));
     assert(data);
     init_data_rows(data, dim, cols);
-    read_csv_file(fname, data);printf("%s\n", goal);
+    read_csv_file(fname, data);
     Adjacency = (double**)malloc(dim * sizeof(double*));
     assert(Adjacency);
     init_data_rows(Adjacency, dim, dim);
@@ -43,11 +43,15 @@ int main(int argc, char **argv){
         print_mat(Adjacency, dim, dim);
         return 2;
     }
-    /*
-    DiagMat = BuildDDG(Adjacency, dim);
-    if(strcmp(goal, "ddg")){
+    DiagMat = (double**)malloc(dim * sizeof(double*));
+    assert(DiagMat);
+    init_data_rows(DiagMat, dim, dim);
+    BuildDDG(Adjacency, dim, DiagMat);
+    if(strcmp(goal, "ddg") == 0){
+        print_mat(DiagMat, dim, dim);
         return 2;
     }
+    /*
     laplacian = BuildLap(DiagMat, Adjacency, dim);
     if(strcmp(goal, "lnorm")){
         return 3;
@@ -433,15 +437,12 @@ void multiply(int dim, double** A, double** B, double** res){
     }
 }
 
-double** BuildDDG(double** Adj, int dim){
+void BuildDDG(double** Adj, int dim, double **diag){
     int  i = 0, j;
-    double **diag;
     double sumline;
-    diag = (double**)malloc(dim * sizeof(double*));
-    assert(diag != NULL);
+    assert(diag);
     for(i=0; i < dim; i++){
-        diag[i] = (double*)malloc(dim * sizeof(double));
-        assert(diag[i] != NULL);
+        assert(diag[i]);
         sumline = 0;
         for(j = 0; j <= dim; j++){
             sumline += Adj[i][j];
@@ -449,9 +450,8 @@ double** BuildDDG(double** Adj, int dim){
                 diag[i][j] = 0;
             }
         }
-        diag[i][i] = 1/ sqrt(sumline);
+        diag[i][i] = sumline;
     }
-    return diag;
 }
 
 void WAMatrix(double** data, int dim, double** adj){
