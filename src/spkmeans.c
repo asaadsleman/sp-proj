@@ -18,7 +18,7 @@ int main(int argc, char **argv){
     int dim, cols; /*, k, i;
     char *fname, *goal;*/
     char *fname;
-    double **data; /* **Adjacency **DiagMat, **laplacian, **jacobi, **u, **t, **ev; */
+    double **data, **Adjacency; /* **DiagMat, **laplacian, **jacobi, **u, **t, **ev; */
     if(argc < 4){
         printf("not enough parameters");
         return -1;
@@ -36,14 +36,16 @@ int main(int argc, char **argv){
     assert(data);
     init_data_rows(data, dim, cols);
     read_csv_file(fname, data);
-    /*
-    Adjacency = WAMatrix(data, dim);
+    Adjacency = (double**)malloc(dim * sizeof(double*));
+    assert(Adjacency);
+    init_data_rows(Adjacency, dim, dim);
+    WAMatrix(data, dim, Adjacency);
     if (strcmp(goal, "wam"))
     {
-        print_mat(Adjacency, dim);
-        printf("%d", k);
+        print_mat(Adjacency, dim, dim);
         return 1;
     }
+    /*
     DiagMat = BuildDDG(Adjacency, dim);
     if(strcmp(goal, "ddg")){
         return 2;
@@ -454,25 +456,21 @@ double** BuildDDG(double** Adj, int dim){
     return diag;
 }
 
-double** WAMatrix(double** data, int dim){
+void WAMatrix(double** data, int dim, double** adj){
     int i = 0, j;
-    double **AdMat;
-    AdMat = (double**)malloc(dim * sizeof(double *));
-    assert(AdMat != NULL);
+    assert(adj);
     for(i=0; i < dim; i++){
-        AdMat[i] = (double*)malloc(dim * sizeof(double));
-        assert(AdMat[i] != NULL);
+        assert(adj[i]);
         for(j = 0; j <= i; j++){
             if (i == j)
             {
                 AdMat[i][i] = 0;
                 continue;
             }
-            AdMat[i][j] = CalcWeight(data[i], data[j]);
-            AdMat[j][i] = AdMat[i][j];
+            adj[i][j] = CalcWeight(data[i], data[j]);
+            adj[j][i] = adj[i][j];
         }
     }
-    return AdMat;
 
 }
 

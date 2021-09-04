@@ -14,7 +14,7 @@ double** BuildLap(double** Diag, double** Adj, int dim);
 void subtract(int dim, double** A, double** B, double** res);
 void multiply(int dim, double** A, double** B, double** res);
 double** BuildDDG(double** Adj, int dim);
-double** WAMatrix(double** data, int dim);
+void WAMatrix(double** data, int dim, double** adj);
 double CalcWeight(double* point1, double* point);
 void read_csv_file(char *filename, double** data);
 void print_mat(double** mat, int dim, int cols);
