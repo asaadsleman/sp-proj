@@ -15,29 +15,35 @@
 
 
 int main(int argc, char **argv){
-    int k, dim, i;
-    char *fname, *goal;
-    double **Adjacency, **DiagMat, **laplacian, **jacobi, **u, **t, **ev;
-    double *data[MAXLEN];
+    int dim, cols; /*, k, i;
+    char *fname, *goal;*/
+    char *fname;
+    double **data; /* **Adjacency **DiagMat, **laplacian, **jacobi, **u, **t, **ev; */
     if(argc < 4){
         printf("not enough parameters");
         return -1;
     }
-    /* Read User Data */
+    /* Read User Data
     k = atoi(argv[1]);
     goal = argv[2];
+    */
     fname = argv[3];
-    /* Read File */
-    data = (double**)malloc(MAXLEN * sizeof(double*));
+    /*Read File */
+    /* get dims of data*/
+    cols = get_feature_num(fname);
+    data = (double**)malloc(sizeof(double*));
     assert(data);
-    dim = read_csv_file(fname, &data);
-    Adjacency = WAMatrix(&data, dim);
+    dim = read_csv_file(fname, data, cols);
+    print_mat(data, dim, cols);
+    /*
+    Adjacency = WAMatrix(data, dim);
     if (strcmp(goal, "wam"))
     {
-        print_mat(&Adjacency, dim);
+        print_mat(Adjacency, dim);
+        printf("%d", k);
         return 1;
     }
-    /* DiagMat = BuildDDG(Adjacency, dim);
+    DiagMat = BuildDDG(Adjacency, dim);
     if(strcmp(goal, "ddg")){
         return 2;
     }
@@ -74,13 +80,36 @@ int main(int argc, char **argv){
 	return 0;
 }
 
-void print_mat(double** mat, int dim){
+void print_mat(double** mat, int dim, int cols){
     int i, j;
-    for (i = 0; i < m; i++){
-        for (j = 0; j < N; j++)
-        printf("%d ", arr[i][j]);
+    for (i = 0; i < dim; i++){
+        for (j = 0; j < cols; j++){
+        printf("%f ", mat[i][j]);
+        }
         printf("\n");
     }
+}
+
+int get_feature_num(char* file){
+    int col = 0;
+    char buffer[MAXWID];
+    char *value;
+    FILE *fp;
+
+    fp = fopen (file, "r");
+    if (!fp) {
+        fprintf (stderr, "failed to open file for reading\n");
+        exit(-1);
+    }
+    if(fgets(buffer, MAXWID+1, fp)){
+        value = strtok(buffer, ",");
+        while (value) {
+            value = strtok(NULL, ",");
+            col++;
+        }
+    }
+    fclose(fp);
+    return col;
 }
 
 void BuildT(int dim, int k, double** u, double** t){
@@ -428,12 +457,12 @@ double CalcWeight(double* point1, double* point2){
     return exp(-dis_sq/2);
 }
 
-int read_csv_file(char *filename, double** data){
+int read_csv_file(char *filename, double** data, int cols){
     int row = 0;
     int col = 0;
-    int colCount = 0;
     double elem = 0.0;
     char buffer[MAXWID];
+    char *value;
     FILE *fp;
 
     fp = fopen (filename, "r");
@@ -442,27 +471,19 @@ int read_csv_file(char *filename, double** data){
         exit(-1);
     }
 
-    while (fgets(buffer, MAXWID, fp)) {
-            /* first line */
-            if(row == 0){
-                char* cntr = strtok(buffer, ", ");
-                while (cntr) {
-                value = strtok(NULL, ", ");
-                colCount++;
-                }
-            }
+    while (fgets(buffer, MAXWID + 1, fp)) {
             col = 0;
             row++;
             data = (double**)realloc(data, row * sizeof(double*));
             assert(data);
-            data[row-1] = (double*)malloc(colCount * sizeof(double));
+            data[row-1] = (double*)malloc(cols * sizeof(double));
             assert(data[row-1]);
             /* Splitting the data */
-            char* value = strtok(buffer, ", ");
+            value = strtok(buffer, ",");
             while (value) {
                 elem = atof(value);
                 data[row-1][col] = elem;
-                value = strtok(NULL, ", ");
+                value = strtok(NULL, ",");
                 col++;
             }
         }
