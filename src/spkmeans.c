@@ -31,10 +31,11 @@ int main(int argc, char **argv){
     /*Read File */
     /* get dims of data*/
     cols = get_feature_num(fname);
-    data = (double**)malloc(sizeof(double*));
+    dim = get_points_num(fname);
+    data = (double**)malloc(dim * sizeof(double*));
     assert(data);
-    dim = read_csv_file(fname, data, cols);
-    print_mat(data, dim, cols);
+    init_data_rows(data, dim, cols);
+    read_csv_file(fname, data);
     /*
     Adjacency = WAMatrix(data, dim);
     if (strcmp(goal, "wam"))
@@ -80,6 +81,16 @@ int main(int argc, char **argv){
 	return 0;
 }
 
+void init_data_rows(double** data, int rows, int cols){
+    int i;
+    assert(data);
+    for (i = 0; i < rows; i++)
+    {
+        data[i] = (double*)malloc(cols * sizeof(double));
+        assert(data[i]);
+    }
+}
+
 void print_mat(double** mat, int dim, int cols){
     int i, j;
     for (i = 0; i < dim; i++){
@@ -110,6 +121,24 @@ int get_feature_num(char* file){
     }
     fclose(fp);
     return col;
+}
+
+int get_points_num(char* file){
+    int row = 0;
+    char ch;
+    FILE *fp;
+
+    fp = fopen (file, "r");
+    if (!fp) {
+        fprintf (stderr, "failed to open file for reading\n");
+        exit(-1);
+    }
+    while((ch=fgetc(fp))!=EOF) {
+      if(ch=='\n')
+         row++;
+   }
+    fclose(fp);
+    return row;
 }
 
 void BuildT(int dim, int k, double** u, double** t){
@@ -457,7 +486,7 @@ double CalcWeight(double* point1, double* point2){
     return exp(-dis_sq/2);
 }
 
-int read_csv_file(char *filename, double** data, int cols){
+void read_csv_file(char *filename, double** data){
     int row = 0;
     int col = 0;
     double elem = 0.0;
@@ -474,10 +503,6 @@ int read_csv_file(char *filename, double** data, int cols){
     while (fgets(buffer, MAXWID + 1, fp)) {
             col = 0;
             row++;
-            data = (double**)realloc(data, row * sizeof(double*));
-            assert(data);
-            data[row-1] = (double*)malloc(cols * sizeof(double));
-            assert(data[row-1]);
             /* Splitting the data */
             value = strtok(buffer, ",");
             while (value) {
@@ -488,5 +513,4 @@ int read_csv_file(char *filename, double** data, int cols){
             }
         }
         fclose(fp);
-        return row;
 }
