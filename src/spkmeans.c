@@ -17,7 +17,7 @@
 int main(int argc, char **argv){
     int dim, cols; /*, k, i;*/
     char *fname, *goal;
-    double **data, **Adjacency, **DiagMat, **laplacian; /*, , **jacobi, **u, **t, **ev; */
+    double **data, **Adjacency, **DiagMat, **laplacian, **jacobi; /*,, **u, **t, **ev; */
     if(argc < 4){
         printf("not enough parameters");
         return -1;
@@ -59,8 +59,9 @@ int main(int argc, char **argv){
         return 4;
     }
     jacobi = BuildJacobi(dim, laplacian);
-    assert(jacobi != NULL);
-    if(strcmp(goal, "jacobi")){
+    assert(jacobi);
+    if(strcmp(goal, "jacobi") == 0){
+        print_mat(jacobi, dim, dim);
         return 4;
     }
     /*
@@ -262,48 +263,59 @@ double* diagonal(double** mat, int dim){
 
 /* apply jacobi algorithm as detailed in assignment*/
 double** BuildJacobi(int dim, double** mat){
-    double* max;
-    double** p, *diag, **jacobi;
-    int i, j, k;
+    double sum;
+    double *ev, **jacobi, *max;
+    int i, j, k, q, max_it = 100;
     i = 0;
     j = 0;
-    p = (double**)malloc(dim * sizeof(double*));
-    assert(p);
-    buildID(dim, p);
-    jacobi = (double**) malloc(dim*sizeof(double*));
+    jacobi = (double**)calloc(dim , sizeof(double*));
     assert(jacobi);
-    diag = (double*) malloc(dim * sizeof(double));
-    assert(diag);
-    for (k = 0; k < dim; k++)
+    ev = (double*)calloc(dim, sizeof(double));
+    assert(ev);
+    /* init as id matrix*/
+    for (i = 0; i < dim; i++)
     {
-        jacobi[k] = (double*) malloc(dim*sizeof(double));
-        assert(jacobi[k]);
+        jacobi[i] = (double*)calloc(dim, sizeof(double));
+        assert(jacobi[i]);
+        jacobi[i][i] = 1.0;
     }
-    for (k = 0; k < 100; k++)
+    /*repeat unntil max_it*/
+    for (k = 0; k < max_it; k++)
     {
+        sum = offDiagSum(mat, dim);
         max = offElem(dim, mat);
-        if(max[0] < EPS){
-            diag = diagonal(mat, dim);
-            correctMat(dim, diag, p, jacobi);
-            free(p);
-            free(diag);
+        i = (int)max[1];
+        j = (int)max[2];
+        /* in case of convergence*/
+        if(sum<EPS){
+            for (q = 0; q < dim; q++)
+            {
+                ev[k] = mat[k][k];
+            }
             return jacobi;
         }
-        rotate(dim, p, mat, i, j);
+        /*Jacobi rotation movement*/
+        rotate(dim, mat, jacobi, i, j);
+
     }
-    printf("Jacobi did not converge!");
+    printf("no conversion - JACOBI ERROR");
     return NULL;
+    
 }
 
-/* build identity matrix of size N X N*/
-void buildID(int N, double** res){
-    int i;
-    assert(res);
-    for(i = 0; i < N; i++){
-        res[i] = (double*)calloc(N, sizeof(double));
-        assert(res[i]);
-        res[i][i] = 1.0;
+/* calculate off-diagonal elements' sum */
+double offDiagSum(double** mat, int dim){
+    double sum = 0.0;
+    int i,j;
+    for ( i = 0; i < dim; i++)
+    {
+        for ( j = i+1; j < dim; j++)
+        {
+            sum += pow(abs(mat[i][j]), 2);
+        }
+        
     }
+    return sum;
 }
 
 
@@ -312,12 +324,12 @@ double* offElem(int dim, double** mat){
     double max, max_i, max_j;
     double* res;
     int i, j;
-    max = mat[0][1];
+    max = 0.0;
     for (i = 0; i < dim; i++)
     {
-        for (j = 0; j < dim; j++)
+        for (j = i+1; j < dim; j++)
         {
-            if (mat[i][j] > max && i != j)
+            if (abs(mat[i][j]) > max)
             {
                 max = mat[i][j];
                 max_i = (double)i;
