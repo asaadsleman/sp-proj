@@ -17,7 +17,7 @@
 int main(int argc, char **argv){
     int dim, cols; /*, k, i;*/
     char *fname, *goal;
-    double **data, **Adjacency, **DiagMat; /*, **laplacian, **jacobi, **u, **t, **ev; */
+    double **data, **Adjacency, **DiagMat, **laplacian; /*, , **jacobi, **u, **t, **ev; */
     if(argc < 4){
         printf("not enough parameters");
         return -1;
@@ -49,13 +49,14 @@ int main(int argc, char **argv){
     BuildDDG(Adjacency, dim, DiagMat);
     if(strcmp(goal, "ddg") == 0){
         print_mat(DiagMat, dim, dim);
-        return 2;
-    }
-    /*
-    laplacian = BuildLap(DiagMat, Adjacency, dim);
-    if(strcmp(goal, "lnorm")){
         return 3;
     }
+    laplacian = BuildLap(DiagMat, Adjacency, dim);
+    if(strcmp(goal, "lnorm") == 0){
+        print_mat(laplacian, dim, dim);
+        return 3;
+    }
+    /*
     jacobi = BuildJacobi(dim, laplacian);
     assert(jacobi != NULL);
     if(strcmp(goal, "jacobi")){
@@ -291,11 +292,10 @@ double** BuildJacobi(int dim, double** mat){
 
 void buildID(int N, double** res){
     int i;
-    res = (double**)malloc(N*sizeof(double*));
     assert(res);
     for(i = 0; i < N; i++){
         res[i] = (double*)calloc(N, sizeof(double));
-        assert(res[i] != NULL);
+        assert(res[i]);
         res[i][i] = 1.0;
     }
 }
@@ -390,52 +390,62 @@ void rotate(int dim, double** p, double** mat, int i, int j){
 }
 
 double** BuildLap(double** Diag, double** Adj, int dim){
-    double **Laplacian, **Id;
-    double **Mid, **Mid2;
-    Laplacian = (double**)malloc(dim * sizeof(double*));
-    assert(Laplacian);
-    Id = (double**)malloc(dim * sizeof(double*));
-    assert(Id);
-    Mid = (double**)malloc(dim * sizeof(double*));
-    assert(Mid);
-    Mid2 = (double**)malloc(dim * sizeof(double*));
-    assert(Mid2);
-    buildID(dim, Id);
-    multiply(dim, Diag, Adj, Mid);
-    multiply(dim, Mid, Diag, Mid2);
-    subtract(dim, Id, Mid2, Laplacian);
-    free(Id);
-    free(Mid2);
-    free(Mid);
-    return Laplacian;
-
-}
-
-void subtract(int dim, double** A, double** B, double** res){
-    int i, j;
-    for (i = 0; i < dim; i++) {
-        for (j = 0; j < dim; j++) {
-            res[i][j] = 0;
-            res[i][j] = A[i][j] - B[i][j];
+    int i;
+    /*sqrt of diag*/
+    for (i = 0; i < dim; i++)
+    {
+        Diag[i][i] = 1/ sqrt(Diag[i][i]);
     }
-}
+    multiply_diag_by(dim, Diag, Adj);
+    multiply_by_Diag(dim, Adj, Diag);
+    eye_minus(dim, Adj);
+    return Adj;
 }
 
-void multiply(int dim, double** A, double** B, double** res){
-    int i, j, k;
-    res = (double**)malloc(dim * sizeof(double*));
-    assert(res);
-    for (i = 0; i < dim; i++) {
-        res[i] = (double*)malloc(dim * sizeof(double));
-        assert(res[i]);
-        for (j = 0; j < dim; j++) {
-            res[i][j] = 0;
-            for (k = 0; k < dim; k++){
-                res[i][j] += A[i][k] * B[k][j];
+/* calculates (I - mat) where I is identity matrix */
+void eye_minus(int dim, double** mat){
+    int i, j;
+    double tmpVal = 0.0;
+    for (i = 0; i < dim; i++)
+    {
+        for (j = 0; j < dim; j++)
+        {
+            if (i == j)
+            {
+                tmpVal = 1 - mat[i][i];
+                mat[i][i] = tmpVal;
+            } else{
+                tmpVal = -mat[i][j];
+                mat[i][j] = tmpVal;
             }
         }
     }
 }
+
+/* multiply A @ B where A is diagonal*/
+void multiply_diag_by(int dim, double** A, double** B){
+    int i, j;
+    double tmpVal = 0.0;
+    for (i = 0; i < dim; i++) {
+        for (j = 0; j < dim; j++) {
+            tmpVal = A[i][i] * B[i][j];
+            B[i][j] = tmpVal;
+        }
+    }
+}
+
+/* multiply A @ B where B is diagonal*/
+void multiply_by_Diag(int dim, double** A, double** B){
+    int i, j;
+    double tmpVal = 0.0;
+    for (i = 0; i < dim; i++) {
+        for (j = 0; j < dim; j++) {
+            tmpVal = A[i][j] * B[j][j];
+            A[i][j] = tmpVal;
+        }
+    }
+}
+
 
 void BuildDDG(double** Adj, int dim, double **diag){
     int  i = 0, j;
