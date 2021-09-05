@@ -10,7 +10,7 @@ def main():
     # Read user CMD arguments
     k = sys.argv[1]
     goal = sys.argv[2]
-    filelines = pd.read_csv(sys.argv[3]).astype('float64')
+    filelines = pd.read_csv(sys.argv[3]).astype('float64').to_numpy()
     # Interface with C
     dim = filelines.shape[0]
     Wam = spkmeans.WAMatrix(filelines, dim)

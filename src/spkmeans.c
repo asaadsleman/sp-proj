@@ -52,16 +52,18 @@ int main(int argc, char **argv){
         return 3;
     }
     laplacian = BuildLap(DiagMat, Adjacency, dim);
+    free(Adjacency);
+    free(DiagMat);
     if(strcmp(goal, "lnorm") == 0){
         print_mat(laplacian, dim, dim);
-        return 3;
+        return 4;
     }
-    /*
     jacobi = BuildJacobi(dim, laplacian);
     assert(jacobi != NULL);
     if(strcmp(goal, "jacobi")){
         return 4;
     }
+    /*
     ev = (double**)malloc(dim*sizeof(double*));
     assert(ev != NULL);
     for (i = 0; i < dim; i++)
@@ -258,6 +260,7 @@ double* diagonal(double** mat, int dim){
     
 }
 
+/* apply jacobi algorithm as detailed in assignment*/
 double** BuildJacobi(int dim, double** mat){
     double* max;
     double** p, *diag, **jacobi;
@@ -274,7 +277,7 @@ double** BuildJacobi(int dim, double** mat){
     for (k = 0; k < dim; k++)
     {
         jacobi[k] = (double*) malloc(dim*sizeof(double));
-        assert(jacobi[k] != NULL);
+        assert(jacobi[k]);
     }
     for (k = 0; k < 100; k++)
     {
@@ -282,6 +285,8 @@ double** BuildJacobi(int dim, double** mat){
         if(max[0] < EPS){
             diag = diagonal(mat, dim);
             correctMat(dim, diag, p, jacobi);
+            free(p);
+            free(diag);
             return jacobi;
         }
         rotate(dim, p, mat, i, j);
@@ -290,6 +295,7 @@ double** BuildJacobi(int dim, double** mat){
     return NULL;
 }
 
+/* build identity matrix of size N X N*/
 void buildID(int N, double** res){
     int i;
     assert(res);
@@ -300,6 +306,8 @@ void buildID(int N, double** res){
     }
 }
 
+
+/* find and return maximum non-diagonal element in mat and it's coordinates (i,j)*/
 double* offElem(int dim, double** mat){
     double max, max_i, max_j;
     double* res;
@@ -325,21 +333,7 @@ double* offElem(int dim, double** mat){
     return  res;
 }
 
-int checkDiag(double **mat, int dim){
-    int i,j;
-    for (i = 0; i < dim; i++)
-    {
-        for (j = 0; j < i; j++)
-        {
-            if (mat[i][j] != 0 || mat[j][i] != 0)
-            {
-                return 0;
-            } 
-        }
-    }
-    return 1;
-}
-
+/* applies one rotation to mat in jacobi algorithm*/
 void rotate(int dim, double** p, double** mat, int i, int j){
     double matDiff, phi, t, c, s, tau, temp;
     int q,m,r;
@@ -389,6 +383,7 @@ void rotate(int dim, double** p, double** mat, int i, int j){
     }    
 }
 
+/* build laplacian normalized matrix */
 double** BuildLap(double** Diag, double** Adj, int dim){
     int i;
     /*sqrt of diag*/
@@ -446,7 +441,7 @@ void multiply_by_Diag(int dim, double** A, double** B){
     }
 }
 
-
+/* builds the diagonal degree matrix from the weighted adjacency mat*/
 void BuildDDG(double** Adj, int dim, double **diag){
     int  i = 0, j;
     double sumline;
@@ -464,6 +459,7 @@ void BuildDDG(double** Adj, int dim, double **diag){
     }
 }
 
+/* fills weighted adjacency matrix according to points in data*/
 void WAMatrix(double** data, int dim, double** adj){
     int i = 0, j;
     assert(adj);
@@ -482,6 +478,7 @@ void WAMatrix(double** data, int dim, double** adj){
 
 }
 
+/* calculates weight between 2 given datapoints*/
 double CalcWeight(double* point1, double* point2){
     double dis_sq = 0;
     int i = 0, len;
@@ -492,6 +489,7 @@ double CalcWeight(double* point1, double* point2){
     return exp(-dis_sq/2);
 }
 
+/* returns a double matrix of data points from filename*/
 void read_csv_file(char *filename, double** data){
     int row = 0;
     int col = 0;
