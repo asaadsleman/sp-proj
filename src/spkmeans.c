@@ -225,7 +225,7 @@ int eigengap(int dim, double** eigenVals){
     assert(diffs);
     for (i = 0; i < dim-1; i++)
     {
-        diffs[i] = abs(eigenVals[i][0] - eigenVals[i+1][0]);
+        diffs[i] = fabs(eigenVals[i][0] - eigenVals[i+1][0]);
         if (diffs[i] > maxAbs)
         {
             maxAbs = diffs[i];
@@ -326,7 +326,7 @@ double offDiagSum(double** mat, int dim){
     {
         for ( j = i+1; j < dim; j++)
         {
-            curr = pow(abs(mat[i][j]), 2.0);
+            curr = pow(fabs(mat[i][j]), 2.0);
             sum += curr;
         }
     }
@@ -344,9 +344,9 @@ double* offElem(int dim, double** mat){
     {
         for (j = i+1; j < dim; j++)
         {
-            if (abs(mat[i][j]) > max)
+            if (fabs(mat[i][j]) > max)
             {
-                max = abs(mat[i][j]);
+                max = fabs(mat[i][j]);
                 max_i = (double)i;
                 max_j = (double)j;
             }
@@ -365,13 +365,13 @@ void rotate(int dim, double** p, double** mat, int i, int j){
     double matDiff, phi, t, c, s, tau, temp;
     int q,m,r;
     matDiff = mat[j][j] - mat[i][i];
-    if (abs(mat[i][j]) < (abs(matDiff)*EPS))
+    if (fabs(mat[i][j]) < (fabs(matDiff)*EPS))
     {
         t = mat[i][j] / matDiff;
     }
     else{
         phi = matDiff/(2.0 * mat[i][j]);
-        t = 1.0/(abs(phi) + sqrt(2.0*phi + 1.0));
+        t = 1.0/(fabs(phi) + sqrt(2.0*phi + 1.0));
         if (phi < 0.0)
         {
             t = -t;
