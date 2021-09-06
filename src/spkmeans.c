@@ -56,11 +56,9 @@ int main(int argc, char **argv){
         print_mat(laplacian, dim, dim);
         return 4;
     }
-    free(Adjacency);
-    free(DiagMat);
     jacobi = BuildJacobi(dim, laplacian);
     if(strcmp(goal, "jacobi") == 0){
-        print_mat(jacobi, dim, dim);
+        print_jac(jacobi, dim, dim);
         printf("fin jac");
         return 4;
     }
@@ -102,6 +100,17 @@ void init_data_rows(double** data, int rows, int cols){
 void print_mat(double** mat, int dim, int cols){
     int i, j;
     for (i = 0; i < dim; i++){
+        for (j = 0; j < cols; j++){
+        printf("%f ", mat[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+void print_jac(double** mat, int dim, int cols){
+    int i, j;
+    for (i = 0; i < dim; i++){
+        break;
         for (j = 0; j < cols; j++){
         printf("%f ", mat[i][j]);
         }
@@ -325,7 +334,7 @@ double offDiagSum(double** mat, int dim){
 }
 
 
-/* find and return maximum non-diagonal element in mat and it's coordinates (i,j)*/
+/* find and return maximum (absolute value) non-diagonal element in mat and it's coordinates (i,j)*/
 double* offElem(int dim, double** mat){
     double max, max_i, max_j;
     double* res;
@@ -337,7 +346,7 @@ double* offElem(int dim, double** mat){
         {
             if (abs(mat[i][j]) > max)
             {
-                max = mat[i][j];
+                max = abs(mat[i][j]);
                 max_i = (double)i;
                 max_j = (double)j;
             }

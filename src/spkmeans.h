@@ -24,3 +24,4 @@ void init_data_rows(double** data, int rows, int cols);
 void multiply_by_Diag(int dim, double** A, double** B);
 void multiply_diag_by(int dim, double** A, double** B);
 double offDiagSum(double** mat, int dim);
+void print_jac(double** mat, int dim, int cols);
