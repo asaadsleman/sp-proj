@@ -288,18 +288,16 @@ double** BuildJacobi(int dim, double** lap){
         assert(jacobi[i]);
         jacobi[i][i] = 1.0;
     }
-    printf("id built\n");
-    print_mat(lap, dim, dim);
     /*repeat unntil max_it*/
     for (k = 0; k < max_it; k++)
     {
-        printf("%d\n",k);
         sum = offDiagSum(lap, dim);
         max = offElem(dim, lap);
         printf("sum : %f\n", sum);
         printf("max : %f\n", *max);
         i = (int)max[1];
         j = (int)max[2];
+        printf("i : %d   j : %d \n", i, j);
         /* in case of convergence*/
         if(sum<EPS){
             printf("reached conv.\n");
@@ -313,7 +311,7 @@ double** BuildJacobi(int dim, double** lap){
         rotate(dim, jacobi, lap, i, j);
         printf("rotation num: %d\n",k);
     }
-    printf("no conversion - JACOBI ERROR");
+    printf("no conversion - JACOBI ERROR\n");
     return NULL;
     
 }
@@ -324,7 +322,7 @@ double offDiagSum(double** mat, int dim){
     int i,j;
     for ( i = 0; i < dim; i++)
     {
-        for ( j = i+1; j < dim; j++)
+        for ( j = 0; j < i; j++)
         {
             curr = pow(fabs(mat[i][j]), 2.0);
             sum += curr;
@@ -360,54 +358,55 @@ double* offElem(int dim, double** mat){
     return  res;
 }
 
+
+/* return sign of x  --- sign(0) = 1.0 */
+double sign(double x){
+    if(x >= 0.0){
+        return 1.0;
+    }
+    return -1.0;
+}
+
 /* applies one rotation to mat in jacobi algorithm*/
-void rotate(int dim, double** p, double** mat, int i, int j){
+void rotate(int dim, double** p, double** mat, int k, int l){
     double matDiff, phi, t, c, s, tau, temp;
-    int q,m,r;
-    matDiff = mat[j][j] - mat[i][i];
-    if (fabs(mat[i][j]) < (fabs(matDiff)*EPS))
-    {
-        t = mat[i][j] / matDiff;
-    }
-    else{
-        phi = matDiff/(2.0 * mat[i][j]);
-        t = 1.0/(fabs(phi) + sqrt(2.0*phi + 1.0));
-        if (phi < 0.0)
-        {
-            t = -t;
-        }
-    }
+    int i;
+    matDiff = mat[l][l] - mat[k][k];
+    phi = matDiff/(2.0 * mat[k][l]);
+    t = sign(phi)/(fabs(phi) + sqrt(pow(phi, 2.0) + 1.0));
     c = 1.0 / (sqrt(pow(phi, 2) + 1.0));
     s = t*c;
     tau = s/(1.0 + c);
-    temp = mat[i][j];
-    mat[i][j] = 0.0;
-    mat[i][i] = mat[i][i] - t*temp;
-    mat[j][j] = mat[j][j] + t*temp;
-    for (q = 0; q < i; q++)
+    temp = mat[k][l];
+    mat[k][l] = 0.0;
+    mat[k][k] = mat[k][k] - (t * temp);
+    mat[l][l] = mat[l][l] + (t * temp);
+    for (i = 0; i < k; i++)   /* case i < k */
     {
-        temp = mat[q][i];
-        mat[q][i] = temp - s*(mat[q][j] + tau*temp);
-        mat[q][j] = mat[q][j] + s*(temp - tau*mat[q][j]);
+        temp = mat[i][k];
+        mat[i][k] = temp - (s * (mat[i][l] + (tau * temp)));
+        mat[i][l] = mat[i][l] + (s*(temp - (tau*mat[i][l])));
     }
-    for (m = i+1; m < j; m++)
+    for (i = 0; i < k; i++)   /* case k+1 < i < l */
     {
-        temp = mat[i][m];
-        mat[i][m] = temp - s*(mat[m][j] + tau*mat[i][m]);
-        mat[m][j] = mat[m][j] + s*(temp - tau*mat[m][j]);
+        temp = mat[i][k];
+        mat[k][i] = temp - (s * (mat[i][l] + (tau * temp)));
+        mat[i][l] = mat[i][l] + (s*(temp - (tau*mat[i][l])));
     }
-    for (r = j+1; r < dim; r++)
+    for (i = l+1; i < dim; i++)   /* case l+1 < i < dim */
     {
-        temp = mat[i][r];
-        mat[i][r] = temp - s*(mat[j][r] + tau*temp);
-        mat[j][r] = mat[j][r] + s*(temp - tau*mat[j][r]);
+        temp = mat[i][k];
+        mat[k][i] = temp - (s * (mat[l][i] + (tau * temp)));
+        mat[l][i] = mat[l][i] + (s*(temp - (tau*mat[l][i])));
     }
-    for (q = 0; q < dim; q++)
+    for (i = 0; i < dim; i++)   /* update p */
     {
-        temp = p[q][i];
-        p[q][i] = temp - s*(p[q][j] + tau*p[q][i]);
-        p[q][j] = p[q][j] + s*(temp - tau*p[q][j]);
-    }    
+        temp = p[i][k];
+        mat[i][k] = temp - (s * (p[i][l] + (tau * p[i][k])));
+        mat[i][l] = p[i][l] + (s*(temp - (tau*p[i][l])));
+    }
+    
+        
 }
 
 /* build laplacian normalized matrix */
