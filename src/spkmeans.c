@@ -31,6 +31,7 @@ int main(int argc, char **argv){
     /* get dims of data*/
     cols = get_feature_num(fname);
     dim = get_points_num(fname);
+    printf("cols: %d dim: %d\n", cols, dim);
     data = (double**)malloc(dim * sizeof(double*));
     assert(data);
     init_data_rows(data, dim, cols);
@@ -150,7 +151,7 @@ int get_feature_num(char* file){
 
 int get_points_num(char* file){
     int row = 0;
-    char ch;
+    char buffer[MAXWID];
     FILE *fp;
 
     fp = fopen (file, "r");
@@ -158,10 +159,11 @@ int get_points_num(char* file){
         fprintf (stderr, "failed to open file for reading\n");
         exit(-1);
     }
-    while((ch=fgetc(fp))!=EOF) {
-      if(ch=='\n')
-         row++;
-   }
+    while(!feof(fp)) {
+        if(fgets(buffer, MAXWID+1, fp)){
+            row++;
+        }
+    }
     fclose(fp);
     return row;
 }
@@ -280,16 +282,16 @@ double* diagonal(double** mat, int dim){
 
 /* apply jacobi algorithm as detailed in assignment*/
 void BuildJacobi(int dim, double** lap, double** jacobi){
-    double sum;
+    double sum, sumNew = 0.0;
     double *max;
     int i, j, k, max_it;
     i = 0;
     j = 0;
-    max_it = 100;
+    max_it = 300;
+    sum = offDiagSum(lap, dim);
     /*repeat unntil max_it*/
     for (k = 0; k < max_it; k++)
     {
-        sum = offDiagSum(lap, dim);
         max = offElem(dim, lap);
         printf("sum : %f\n", sum);
         printf("max : %f\n", *max);
@@ -297,11 +299,14 @@ void BuildJacobi(int dim, double** lap, double** jacobi){
         j = (int)max[2];
         printf("i : %d   j : %d \n", i, j);
         /* in case of convergence*/
-        if(sum<EPS){
+        if(fabs(sumNew-sum)<EPS){
             printf("reached conv.\n");
+            return;
         }
         /*Jacobi rotation movement*/
         rotate(dim, jacobi, lap, i, j);
+        sum = sumNew;
+        sumNew = offDiagSum(lap, dim);
         printf("rotation num: %d\n",k);
     }
     printf("no conversion - JACOBI ERROR\n");
@@ -313,7 +318,7 @@ double offDiagSum(double** mat, int dim){
     int i,j;
     for ( i = 0; i < dim; i++)
     {
-        for ( j = i+1; j < dim; j++)
+        for ( j = 0; j < i; j++)
         {
             curr = pow(fabs(mat[i][j]), 2.0);
             sum += curr;
@@ -330,7 +335,7 @@ double* offElem(int dim, double** mat){
     max = 0.0;
     for (i = 0; i < dim; i++)
     {
-        for (j = i+1; j < dim; j++)
+        for (j = 0; j < i; j++)
         {
             if (fabs(mat[i][j]) > max)
             {
@@ -359,19 +364,13 @@ double sign(double x){
 /* applies one rotation to mat in jacobi algorithm*/
 void rotate(int dim, double** p, double** mat, int i, int j){
     double phi, t, c, s, tau, temp, temp1, temp2;
-    int k,r;
+    int r;
     phi = (mat[j][j] - mat[i][i])/(2.0 * mat[i][j]);
-    printf("%f\n",phi);
     t = sign(phi)/(fabs(phi) + sqrt(pow(phi, 2.0) + 1.0));
-    printf("%f\n",t);
     c = 1.0 / (sqrt(pow(t, 2) + 1.0));
-    printf("%f\n",c);
     s = t*c;
-    printf("%f\n",s);
     tau = s/(1.0 + c);
-    printf("%f\n",tau);
     temp = mat[i][j];
-    printf("%f\n",temp);
     mat[i][j] = 0.0;
     mat[j][i] = 0.0;
     for (r=0; r<dim ; r++)   /* A'[r][i] */
@@ -379,7 +378,7 @@ void rotate(int dim, double** p, double** mat, int i, int j){
         if(r != i && r != j){
             temp1 = mat[r][i];
             temp2 = mat[r][j];
-            mat[r][i] = (c*temp1) -(s*mat[r][j]);
+            mat[r][i] = (c * temp1) -(s * mat[r][j]);
             mat[r][j] = (c * temp2) + (s * temp1);
             mat[i][r] = mat[r][i];
             mat[j][r] = mat[r][j];
@@ -389,30 +388,14 @@ void rotate(int dim, double** p, double** mat, int i, int j){
     temp2 = mat[j][j];
     mat[i][i] = (c * c * temp1) + (s * s * temp2) - (2.0 * s * c * temp);
     mat[j][j] = (s * s * temp1) + (c * c * temp2) + (2.0 * s * c * temp);
-    update_p(dim, p, c, s, i, j);
-    
-        
-}
-
-void update_p(int dim, double** p, double c, double s, int i, int j){
-    double **p_i, **res;
-    int k;
-    p_i = (double**)calloc(dim, sizeof(double*));
-    assert(p_i);
-    for (k = 0; k < dim; k++)
+    for (r = 0; r < dim; r++) /*update p */
     {
-        p_i[k] = (double*)calloc(dim, sizeof(double));
-        assert(p_i[k]);
-        p_i[k][k] = 1.0;
+        temp = p[r][i];
+        p[r][i] = temp - (s*(p[r][j] + tau * p[r][i]));
+        p[r][j] = p[r][j] + (s*(temp - tau*p[r][j]));
+        p[i][r] = p[r][i];
+        p[j][r] = p[r][j];
     }
-    p_i[i][i] = c;
-    p_i[j][j] = c;
-    p_i[i][j] = s;
-    p_i[j][i] = -1.0 * s;
-    res = multiply_mat(dim, p, p_i);
-    p = res;
-    free(p_i);
-    
 }
 
 /* build laplacian normalized matrix */
@@ -447,28 +430,6 @@ void eye_minus(int dim, double** mat){
             }
         }
     }
-}
-
-/*multiply A @ B in regular matrix multiplication*/
-double** multiply(int dim, double** A, double** B)
-{
-    double** res;
-    int i,j,k;
-    res = (double**)calloc(dim, sizeof(double*));
-    assert(res);
-    for(i=0;i<dim;i++)
-    {
-        res[i] = (double*)calloc(dim, sizeof(double));
-        assert(res[i]);
-        for(j=0;j<dim;j++)
-        {
-            for(k=0;k<dim;k++)
-            {
-                res[i][j]=res[i][j]+(A[i][k]*B[k][j]);
-            }
-        }
-    }
-    return res;
 }
 
 /* multiply A @ B where A is diagonal*/

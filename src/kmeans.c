@@ -154,3 +154,24 @@ int reassign_point(int swap,int k, int ci, int cj, int dim_num, double point[], 
       swap = swap + 1;
       return swap;
 }
+
+void update_p(int dim, double** p, double c, double s, int i, int j){
+    double **p_i, **res;
+    int k;
+    p_i = (double**)calloc(dim, sizeof(double*));
+    assert(p_i);
+    for (k = 0; k < dim; k++)
+    {
+        p_i[k] = (double*)calloc(dim, sizeof(double));
+        assert(p_i[k]);
+        p_i[k][k] = 1.0;
+    }
+    p_i[i][i] = c;
+    p_i[j][j] = c;
+    p_i[i][j] = s;
+    p_i[j][i] = -1.0 * s;
+    res = multiply_mat(dim, p, p_i);
+    p = res;
+    free(p_i);
+    
+}
