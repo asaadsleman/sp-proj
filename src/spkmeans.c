@@ -52,16 +52,16 @@ int main(int argc, char **argv){
         return 3;
     }
     laplacian = BuildLap(DiagMat, Adjacency, dim);
-    free(Adjacency);
-    free(DiagMat);
     if(strcmp(goal, "lnorm") == 0){
         print_mat(laplacian, dim, dim);
         return 4;
     }
+    free(Adjacency);
+    free(DiagMat);
     jacobi = BuildJacobi(dim, laplacian);
-    assert(jacobi);
     if(strcmp(goal, "jacobi") == 0){
         print_mat(jacobi, dim, dim);
+        printf("fin jac");
         return 4;
     }
     /*
@@ -262,7 +262,7 @@ double* diagonal(double** mat, int dim){
 }
 
 /* apply jacobi algorithm as detailed in assignment*/
-double** BuildJacobi(int dim, double** mat){
+double** BuildJacobi(int dim, double** lap){
     double sum;
     double *ev, **jacobi, *max;
     int i, j, k, q, max_it = 100;
@@ -279,24 +279,30 @@ double** BuildJacobi(int dim, double** mat){
         assert(jacobi[i]);
         jacobi[i][i] = 1.0;
     }
+    printf("id built\n");
+    print_mat(lap, dim, dim);
     /*repeat unntil max_it*/
     for (k = 0; k < max_it; k++)
     {
-        sum = offDiagSum(mat, dim);
-        max = offElem(dim, mat);
+        printf("%d\n",k);
+        sum = offDiagSum(lap, dim);
+        max = offElem(dim, lap);
+        printf("sum : %f\n", sum);
+        printf("max : %f\n", *max);
         i = (int)max[1];
         j = (int)max[2];
         /* in case of convergence*/
         if(sum<EPS){
+            printf("reached conv.\n");
             for (q = 0; q < dim; q++)
             {
-                ev[k] = mat[k][k];
+                ev[k] = lap[k][k];
             }
             return jacobi;
         }
         /*Jacobi rotation movement*/
-        rotate(dim, mat, jacobi, i, j);
-
+        rotate(dim, jacobi, lap, i, j);
+        printf("rotation num: %d\n",k);
     }
     printf("no conversion - JACOBI ERROR");
     return NULL;
@@ -305,15 +311,15 @@ double** BuildJacobi(int dim, double** mat){
 
 /* calculate off-diagonal elements' sum */
 double offDiagSum(double** mat, int dim){
-    double sum = 0.0;
+    double sum = 0.0, curr = 0.0;
     int i,j;
     for ( i = 0; i < dim; i++)
     {
         for ( j = i+1; j < dim; j++)
         {
-            sum += pow(abs(mat[i][j]), 2);
+            curr = pow(abs(mat[i][j]), 2.0);
+            sum += curr;
         }
-        
     }
     return sum;
 }
