@@ -1,6 +1,6 @@
-void BuildT(int dim, int k, double** u, double** t);
+void NormalizeU(int dim, int k, double** u);
 void BuildU(int dim, int k, double** jac, double** u);
-void transpose(int up, int side, double** mat);
+void transpose(int n, double** mat);
 int eigengap(int dim, double** eigenVals);
 int cmp(const void *x, const void *y);
 double** BuildLap(double** Diag, double** Adj, int dim);
@@ -20,3 +20,5 @@ void multiply_diag_by(int dim, double** A, double** B);
 void Jacobi_rotate ( double **A, double **R, int k, int l, int n );
 double* offdiag(double** A, int n);
 void BuildJacobi(int dim, double** mat, double** jacobi);
+void perform(char *goal, double **data, int dim);
+void eigsrt(double *ev, double **vec, int n);

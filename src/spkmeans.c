@@ -16,30 +16,36 @@
 
 
 int main(int argc, char **argv){
-    int dim, cols, i; /*, k;*/
-    char *fname, *goal;
-    double **data, **Adjacency, **DiagMat, **laplacian, **jacobi; /*,, **u, **t, */
+    int dim, cols; /*, k;*/
+    char *goal;
+    double **data; /*,, **u, **t, */
     if(argc < 4){
         printf("not enough parameters");
         return -1;
     }
-    /* Read User Data
+    /* read user args */
     k = atoi(argv[1]);
-    */
     goal = argv[2];
-    fname = argv[3];
     /*Read File */
     /* get dims of data*/
-    cols = get_feature_num(fname);
-    dim = get_points_num(fname);
+    cols = get_feature_num(argv[3]);
+    dim = get_points_num(argv[3]);
     printf("cols: %d dim: %d\n", cols, dim);
     data = (double**)malloc(dim * sizeof(double*));
     assert__(data){
         printf("An Error Has Occured");
     }
     init_data_rows(data, dim, cols);
-    read_csv_file(fname, data);
-    if(strcmp(goal, "jacobi") == 0){
+    read_csv_file(argv[3], data);
+    perform(k, goal, data, dim);
+
+	return 0;
+}
+
+void perform(int k, char *goal, double **data, int dim){
+    int i;
+    double **Adjacency, **DiagMat, **laplacian, **jacobi, *ev;
+    if(strcmp(goal, "jacobi") == 0){  /*jacobi on input matrix only! */
         jacobi = (double**)malloc(dim * sizeof(double*));
         assert(jacobi);
         for (i = 0; i < dim; i++) /* initialize as ID n x n */
@@ -51,11 +57,23 @@ int main(int argc, char **argv){
             jacobi[i][i] = 1.0;
         }
         BuildJacobi(dim, data, jacobi);
+        ev = (double*)malloc(dim * sizeof(double));
+        assert__(ev){
+            printf("An Error Has Occured");
+        }
         for (i = 0; i < dim; i++)
         {
-            printf("ev_%d : %f\n", i, data[i][i]);
+            ev[i] = data[i][i];
         }
-        return 5;
+        transpose(dim, jacobi);
+        for (i = 0; i < dim; i++)
+        {
+            if(i != dim-1) printf("%.4f,", ev[i]);
+            else printf("%.4f", ev[i]);
+        }
+        printf("\n");
+        print_mat(jacobi, dim, dim);
+        return;
     }
     Adjacency = (double**)malloc(dim * sizeof(double*));
     assert__(Adjacency){
@@ -65,7 +83,7 @@ int main(int argc, char **argv){
     WAMatrix(data, dim, Adjacency);
     if(strcmp(goal, "wam") == 0){
         print_mat(Adjacency, dim, dim);
-        return 2;
+        return;
     }
     DiagMat = (double**)malloc(dim * sizeof(double*));
     assert__(DiagMat){
@@ -75,12 +93,12 @@ int main(int argc, char **argv){
     BuildDDG(Adjacency, dim, DiagMat);
     if(strcmp(goal, "ddg") == 0){
         print_mat(DiagMat, dim, dim);
-        return 3;
+        return;
     }
     laplacian = BuildLap(DiagMat, Adjacency, dim);
     if(strcmp(goal, "lnorm") == 0){
         print_mat(laplacian, dim, dim);
-        return 4;
+        return;
     }
     jacobi = (double**)malloc(dim * sizeof(double*));
     assert__(jacobi){
@@ -95,32 +113,48 @@ int main(int argc, char **argv){
         jacobi[i][i] = 1.0;
     }
     BuildJacobi(dim, laplacian, jacobi);
-    if(strcmp(goal, "jacobi") == 0){
-        return 4;
+    ev = (double*)malloc(dim*sizeof(double)); /* eigen values */
+    assert__(ev){
+        printf("An Error Has Occured");
     }
-    /*
-    ev = (double**)malloc(dim*sizeof(double*));
-    assert(ev != NULL);
     for (i = 0; i < dim; i++)
     {
-        ev[i] = (double*)malloc(2 * sizeof(double));
-        assert(ev[i] != NULL);
-        ev[i][0] = jacobi[i][i];
-        ev[i][1] = i;
+        ev[i] = laplacian[i][i];
     }
-    qsort(ev, dim, sizeof(double), cmp);
+    eigsrt(ev, jacobi, dim);
+    transpose(dim, jacobi);
     if (k == 0){
         k = eigengap(dim, ev);
     }
     u = (double**)malloc(dim * sizeof(double*));
-    assert(u);
+    assert__(u){
+        printf("An Error Has Occured");
+    }
     BuildU(dim, k, jacobi, u);
-    t = (double**)malloc(dim * sizeof(double*));
-    assert(t);
-    BuildT(dim, k, u, t);
-    */
+    NormalizeU(dim, k, u);
 
-	return 0;
+}
+
+
+void eigsrt(double *ev, double **vec, int n)
+{
+    int k,j,i;
+    double p;
+    for (i=0;i<n;i++) {
+        p = ev[i];
+        k = i;
+        for (j=i+1 ; j<n ; j++)
+        if (ev[j] >= p){ p=ev[j];k = j;}
+        if (k != i) {
+            ev[k] = ev[i];
+            ev[i] = p;
+            for (j=0 ; j<n ; j++) {
+                p = vec[j][i];
+                vec[j][i] = vec[j][k];
+                vec[j][k] = p;
+            }
+        }
+    }
 }
 
 void init_data_rows(double** data, int rows, int cols){
@@ -137,7 +171,11 @@ void print_mat(double** mat, int dim, int cols){
     int i, j;
     for (i = 0; i < dim; i++){
         for (j = 0; j < cols; j++){
-        printf("%f ", mat[i][j]);
+            if(j < cols - 1){
+                printf("%.4f,", mat[i][j]);
+            } else {
+                printf("%.4f", mat[i][j]);
+            }
         }
         printf("\n");
     }
@@ -184,83 +222,70 @@ int get_points_num(char* file){
     return row;
 }
 
-void BuildT(int dim, int k, double** u, double** t){
+/* Normalizes U elements (nxk) by row */
+void NormalizeU(int dim, int k, double** u){
     int i, j;
-    double *lineSums;
-    double sum = 0.0;
-    lineSums = (double*)malloc(dim* sizeof(double));
-    assert(lineSums);
-    t = (double**) malloc(dim * sizeof(double*));
-    assert(t);
-    for(i = 0; i < dim ; i++){
-        sum = 0.0;
-        for (j = 0; j < k; j++)
-        {
-            sum += pow(u[i][j], 2.0);
-        }
-        lineSums[i] = sqrt(sum);
-    }
+    double linesum = 0.0, elem = 0.0;
     for (i = 0; i < dim; i++)
     {
-        t[i] = (double*) malloc(k * sizeof(double));
-        assert(t[i] != NULL);
-        for (j = 0; j < k; j++)
+        linesum = 0.0;
+        for (j = 0; j < k; j++) /* find line sqrt of square sum */
         {
-            t[i][j] = u[i][j]/lineSums[i];
+            linesum += pow(u[i][j], 2.0);
+        }
+        linesum = sqrt(linesum);
+        for (j = 0; j < k; j++) /* normalize elements in row */
+        {
+            elem = u[i][j];
+            u[i][j] = elem/linesum;
         }
     }
-    free(lineSums);
+    
 }
 
 void BuildU(int dim, int k, double** jac, double** u){
     int i, j;
-    u = (double**) malloc(k * sizeof(double*));
-    assert(u);
-    transpose(dim, dim, jac);
-    for (i = 0; i < k; i++)
+    for (i = 0; i < dim; i++)
     {
-        u[i] = (double*) malloc(dim* sizeof(double));
-        assert(u[i]);
-        for (j = 0; j < dim; j++)
+        u[i] = (double*) malloc(k * sizeof(double));
+        assert__(u[i]){
+            printf("An Error Has Occured");
+        }
+        for (j = 0; j < k; j++)
         {
-            u[i] = jac[i];
+            u[i][j] = jac[i][j];
         }
     }
-    transpose(k, dim, u);
 }
 
-void transpose(int up, int side, double** mat){
-    double** temp;
-    int k,m;
-    temp = (double**) malloc(side * sizeof(double*));
-    assert(temp != NULL);
-    for(k = 0; k< side; k++){
-        temp[k] = (double*) malloc(up*sizeof(double));
-        assert(temp[k] != NULL);
-        for(m = 0; m < up; m++){
-            temp[k][m] = mat[m][k];
+/* transpose an nxn matrix */ 
+void transpose(int n, double** mat){
+    double matij;
+    int i,j;
+    for(i = 0; i < n; i++){
+        for(j = 0; j < i; j++){
+            matij = mat[i][j];
+            mat[i][j] = mat[j][i];
+            mat[j][i] = matij;
         }
     }
-    mat = temp;
 }
 
+/* performs eigengap heuristic on eigen-vals and returns k*/
 int eigengap(int dim, double** eigenVals){
     double *diffs, maxAbs;
-    int i, max_i;
-    diffs = (double*)malloc((dim-1)*sizeof(double));
-    assert(diffs);
+    int i, k;
     for (i = 0; i < dim-1; i++)
     {
-        diffs[i] = fabs(eigenVals[i][0] - eigenVals[i+1][0]);
-        if (diffs[i] > maxAbs)
+        if (fabs(eigenVals[i] - eigenVals[i+1]) > maxAbs)
         {
-            maxAbs = diffs[i];
-            max_i = i;
+            maxAbs = fabs(eigenVals[i] - eigenVals[i+1]);
+            k = i;
         }
     }
-    free(diffs);
-    return max_i;
+    return k;
 }
+
 
 int cmp(const void *x, const void *y)
 {
