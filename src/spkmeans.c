@@ -8,7 +8,8 @@
 
 /* some pre processing defs */
 
-#define MAXLEN 1000
+#define assert__(x) for ( ; !(x) ; assert(x) )
+#define MAXLEN 50
 #define MAXWID 100
 #define EPS 1e-15
 
@@ -17,7 +18,7 @@
 int main(int argc, char **argv){
     int dim, cols, i; /*, k;*/
     char *fname, *goal;
-    double **data, **Adjacency, **DiagMat, **laplacian, **jacobi; /*,, **u, **t, **ev; */
+    double **data, **Adjacency, **DiagMat, **laplacian, **jacobi; /*,, **u, **t, */
     if(argc < 4){
         printf("not enough parameters");
         return -1;
@@ -33,11 +34,33 @@ int main(int argc, char **argv){
     dim = get_points_num(fname);
     printf("cols: %d dim: %d\n", cols, dim);
     data = (double**)malloc(dim * sizeof(double*));
-    assert(data);
+    assert__(data){
+        printf("An Error Has Occured");
+    }
     init_data_rows(data, dim, cols);
     read_csv_file(fname, data);
+    if(strcmp(goal, "jacobi") == 0){
+        jacobi = (double**)malloc(dim * sizeof(double*));
+        assert(jacobi);
+        for (i = 0; i < dim; i++) /* initialize as ID n x n */
+        {
+            jacobi[i] = (double*)calloc(dim , sizeof(double));
+            assert__(jacobi[i]){
+                printf("An Error Has Occured");
+            }
+            jacobi[i][i] = 1.0;
+        }
+        BuildJacobi(dim, data, jacobi);
+        for (i = 0; i < dim; i++)
+        {
+            printf("ev_%d : %f\n", i, data[i][i]);
+        }
+        return 5;
+    }
     Adjacency = (double**)malloc(dim * sizeof(double*));
-    assert(Adjacency);
+    assert__(Adjacency){
+        printf("An Error Has Occured");
+    }
     init_data_rows(Adjacency, dim, dim);
     WAMatrix(data, dim, Adjacency);
     if(strcmp(goal, "wam") == 0){
@@ -45,7 +68,9 @@ int main(int argc, char **argv){
         return 2;
     }
     DiagMat = (double**)malloc(dim * sizeof(double*));
-    assert(DiagMat);
+    assert__(DiagMat){
+        printf("An Error Has Occured");
+    }
     init_data_rows(DiagMat, dim, dim);
     BuildDDG(Adjacency, dim, DiagMat);
     if(strcmp(goal, "ddg") == 0){
@@ -58,17 +83,19 @@ int main(int argc, char **argv){
         return 4;
     }
     jacobi = (double**)malloc(dim * sizeof(double*));
-    assert(jacobi);
+    assert__(jacobi){
+        printf("An Error Has Occured");
+    }
     for (i = 0; i < dim; i++)
     {
         jacobi[i] = (double*)malloc(dim * sizeof(double));
-        assert(jacobi[i]);
+        assert__(jacobi[i]){
+            printf("An Error Has Occured");
+        }
         jacobi[i][i] = 1.0;
     }
     BuildJacobi(dim, laplacian, jacobi);
     if(strcmp(goal, "jacobi") == 0){
-        print_jac(jacobi, dim, dim);
-        printf("fin jac");
         return 4;
     }
     /*
@@ -109,17 +136,6 @@ void init_data_rows(double** data, int rows, int cols){
 void print_mat(double** mat, int dim, int cols){
     int i, j;
     for (i = 0; i < dim; i++){
-        for (j = 0; j < cols; j++){
-        printf("%f ", mat[i][j]);
-        }
-        printf("\n");
-    }
-}
-
-void print_jac(double** mat, int dim, int cols){
-    int i, j;
-    for (i = 0; i < dim; i++){
-        break;
         for (j = 0; j < cols; j++){
         printf("%f ", mat[i][j]);
         }
@@ -254,148 +270,84 @@ int cmp(const void *x, const void *y)
   return 0;
 }
 
-void correctMat(int dim, double* arr, double** mat, double **final){
-    int i, j;
-    for (i = 0; i < dim; i++)
-    {
-        for (j = 0; j < i; j++)
-        {
-            final[i][j] = mat[i][j];
-            final[j][i] = final[i][j];
-        }
-        final[i][i] = arr[i];
-    }
-}
-
-double* diagonal(double** mat, int dim){
-    int i;
-    double* res;
-    res = (double*)malloc(dim * sizeof(double));
-    assert(res);
-    for (i = 0; i < dim; i++)
-    {
-        res[i] = mat[i][i];   
-    }
-    return res;
-    
-}
-
 /* apply jacobi algorithm as detailed in assignment*/
-void BuildJacobi(int dim, double** lap, double** jacobi){
-    double sum, sumNew = 0.0;
-    double *max;
-    int i, j, k, max_it;
-    i = 0;
-    j = 0;
-    max_it = 300;
-    sum = offDiagSum(lap, dim);
-    /*repeat unntil max_it*/
-    for (k = 0; k < max_it; k++)
+void BuildJacobi(int dim, double** mat, double** jacobi){
+    int iterations = 0, maxiter = 100;
+    double *maxnondiag;
+    maxnondiag = offdiag(mat, dim);
+    while ( maxnondiag[0] > EPS && iterations < maxiter)
     {
-        max = offElem(dim, lap);
-        printf("sum : %f\n", sum);
-        printf("max : %f\n", *max);
-        i = (int)max[1];
-        j = (int)max[2];
-        printf("i : %d   j : %d \n", i, j);
-        /* in case of convergence*/
-        if(fabs(sumNew-sum)<EPS){
-            printf("reached conv.\n");
-            return;
-        }
-        /*Jacobi rotation movement*/
-        rotate(dim, jacobi, lap, i, j);
-        sum = sumNew;
-        sumNew = offDiagSum(lap, dim);
-        printf("rotation num: %d\n",k);
+        maxnondiag = offdiag(mat, dim);
+        Jacobi_rotate(mat, jacobi, (int)maxnondiag[1], (int)maxnondiag[2], dim);
+        iterations++;
     }
-    printf("no conversion - JACOBI ERROR\n");
 }
 
-/* calculate off-diagonal elements' sum */
-double offDiagSum(double** mat, int dim){
-    double sum = 0.0, curr = 0.0;
-    int i,j;
-    for ( i = 0; i < dim; i++)
-    {
-        for ( j = 0; j < i; j++)
-        {
-            curr = pow(fabs(mat[i][j]), 2.0);
-            sum += curr;
-        }
-    }
-    return sum;
-}
-
-/* find and return maximum (absolute value) non-diagonal element in mat and it's coordinates (i,j)*/
-double* offElem(int dim, double** mat){
-    double max, max_i, max_j;
-    double* res;
+double* offdiag(double** A, int n)
+{
     int i, j;
-    max = 0.0;
-    for (i = 0; i < dim; i++)
+    double *max, aij;
+    max = (double*) calloc(3, sizeof(double));
+    assert__(max){
+        printf("An Error Has Occured");
+    }
+    for (i = 0; i < n; ++i)
     {
-        for (j = 0; j < i; j++)
+        for (j = i+1; j < n; ++j)
         {
-            if (fabs(mat[i][j]) > max)
+            aij = fabs(A[i][j]);
+            if ( aij > max[0])
             {
-                max = fabs(mat[i][j]);
-                max_i = (double)i;
-                max_j = (double)j;
+                max[0] = aij;
+                max[1] = (double)i;
+                max[2] = (double)j;
             }
         }
     }
-    res = (double*)malloc(3 * sizeof(double));
-    assert(res);
-    res[0] = max;
-    res[1] = max_i;
-    res[2] = max_j;
-    return  res;
+    return max;
 }
 
-/* return sign of x  --- sign(0) = 1.0 */
-double sign(double x){
-    if(x >= 0.0){
-        return 1.0;
-    }
-    return -1.0;
-}
-
-/* applies one rotation to mat in jacobi algorithm*/
-void rotate(int dim, double** p, double** mat, int i, int j){
-    double phi, t, c, s, tau, temp, temp1, temp2;
-    int r;
-    phi = (mat[j][j] - mat[i][i])/(2.0 * mat[i][j]);
-    t = sign(phi)/(fabs(phi) + sqrt(pow(phi, 2.0) + 1.0));
-    c = 1.0 / (sqrt(pow(t, 2) + 1.0));
-    s = t*c;
-    tau = s/(1.0 + c);
-    temp = mat[i][j];
-    mat[i][j] = 0.0;
-    mat[j][i] = 0.0;
-    for (r=0; r<dim ; r++)   /* A'[r][i] */
-    {
-        if(r != i && r != j){
-            temp1 = mat[r][i];
-            temp2 = mat[r][j];
-            mat[r][i] = (c * temp1) -(s * mat[r][j]);
-            mat[r][j] = (c * temp2) + (s * temp1);
-            mat[i][r] = mat[r][i];
-            mat[j][r] = mat[r][j];
+void Jacobi_rotate ( double **A, double **R, int k, int l, int n )
+{
+    int i;
+    double s, c, t, tau;
+    double a_kk, a_ll, a_ik, a_il, r_ik, r_il;
+    if ( A[k][l] != 0.0 ) {
+        tau = (A[l][l] - A[k][k])/(2.0*A[k][l]);
+        if ( tau >= 0.0 ) {
+            t = 1.0/(tau + sqrt(1.0 + tau*tau));
+        } else {
+            t = -1.0/(-tau +sqrt(1.0 + tau*tau));
         }
+        c = 1/sqrt(1+t*t);
+        s = c*t;
     }
-    temp1 = mat[i][i];
-    temp2 = mat[j][j];
-    mat[i][i] = (c * c * temp1) + (s * s * temp2) - (2.0 * s * c * temp);
-    mat[j][j] = (s * s * temp1) + (c * c * temp2) + (2.0 * s * c * temp);
-    for (r = 0; r < dim; r++) /*update p */
-    {
-        temp = p[r][i];
-        p[r][i] = temp - (s*(p[r][j] + tau * p[r][i]));
-        p[r][j] = p[r][j] + (s*(temp - tau*p[r][j]));
-        p[i][r] = p[r][i];
-        p[j][r] = p[r][j];
+     else {
+        c = 1.0;
+        s = 0.0;
     }
+    a_kk = A[k][k];
+    a_ll = A[l][l];
+    A[k][k] = c*c*a_kk - 2.0*c*s*A[k][l] + s*s*a_ll;
+    A[l][l] = s*s*a_kk + 2.0*c*s*A[k][l] + c*c*a_ll;
+    A[k][l]= 0.0; 
+    A[l][k] = 0.0;
+    for (i = 0; i < n; i++ ) {
+        if ( i != k && i != l ) {
+            a_ik = A[i][k];
+            a_il = A[i][l];
+            A[i][k] = c*a_ik - s*a_il;
+            A[k][i] = A[i][k];
+            A[i][l] = c*a_il + s*a_ik;
+            A[l][i] = A[i][l];
+        }
+        /* the eigenvecs */
+        r_ik = R[i][k];
+        r_il = R[i][l];
+        R[i][k] = c*r_ik - s*r_il;
+        R[i][l] = c*r_il + s*r_ik;
+    }
+    return;
 }
 
 /* build laplacian normalized matrix */
