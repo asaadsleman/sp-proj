@@ -4,6 +4,7 @@ from numpy.core.fromnumeric import shape
 from numpy.random import rand
 import pandas as pd
 from enum import Enum, auto, unique
+import spkmeans
 
 np.random.seed(0)
 
@@ -28,20 +29,20 @@ def perform(k, objective, data):
         print_matrix(jacobi)
         return
 
-    Wam = spkmeans.WAMatrix(filelines, filelines.shape[0])
-    if goal == 'wam':
+    Wam = spkmeans.WAMatrix(data, data.shape[0])
+    if objective == 'wam':
         print_matrix(Wam)
         return
     ddg = spkmeans.BuildDDG(Wam)
-    if goal == 'ddg':
+    if objective == 'ddg':
         print_matrix(ddg)
         return
     lap = spkmeans.BuildLap(ddg, Wam)
-    if goal == 'lnorm':
+    if objective == 'lnorm':
         print_matrix(lap)
         return
     jacobi = spkmeans.BuildJacobi(lap)
-    if goal == 'jacobi':
+    if objective == 'jacobi':
         print(jacobi)
         return
     ev = [lap[i][i] for i in range(lap.shape[0])]
@@ -49,7 +50,7 @@ def perform(k, objective, data):
     u = np.zeros((lap.shape[0], k), np.float64)
     spkmeans.BuildU(jacobi, ev, u, k)
     # Calculate Initial Centroids as in HW2
-    centr_inf = centroids_init(filelines, k)
+    centr_inf = centroids_init(data, k)
     centr_indx = centr_inf[1]
     centroids = centr_inf[0]
     # Run Classification

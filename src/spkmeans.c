@@ -10,8 +10,10 @@
 
 #define assert__(x) for ( ; !(x) ; assert(x) )
 #define MAXLEN 50
+#define MAXITER 300
 #define MAXWID 100
 #define EPS 1e-15
+
 
 
 
@@ -44,7 +46,7 @@ int main(int argc, char **argv){
 
 void perform(int k, char *goal, double **data, int dim){
     int i;
-    double **Adjacency, **DiagMat, **laplacian, **jacobi, *ev;
+    double **Adjacency, **DiagMat, **laplacian, **jacobi, *ev, **cent;
     if(strcmp(goal, "jacobi") == 0){  /*jacobi on input matrix only! */
         jacobi = (double**)malloc(dim * sizeof(double*));
         assert(jacobi);
@@ -132,6 +134,11 @@ void perform(int k, char *goal, double **data, int dim){
     }
     BuildU(dim, k, jacobi, u);
     NormalizeU(dim, k, u);
+    cent = kmeans(data, dim, k, MAXITER);
+    assert__(cent){
+        printf("An Error Has Occured");
+    }
+    print_mat(cent, k,k);
 
 }
 
@@ -509,4 +516,132 @@ void read_csv_file(char *filename, double** data){
             }
         }
         fclose(fp);
+}
+
+/* distance between 2 points in R^dim */
+double calcDistance(double *point1, double *point2, int dim){
+    double dis = 0.0;
+    int i;
+    for(i = 0; i < dim; i++){
+        dis+= sqrt(pow(fabs(point1[i] - point2[i]),2.0));
+    }
+    return dis;
+}
+
+/* index of minimum element in array of size dim */
+int minIndx(double *arr, int dim){
+    int i, j = 0;
+    double max;
+    min = *arr;
+    for (i = 0; i < dim; i++)
+    {
+        if(arr[i] < min){
+            j = i;
+            min = arr[i];
+        }
+    }
+    return j;
+}
+
+/* make zeroes matrix dim x dim */
+void zeroes(double **mat, int dim){
+    int i, j;
+    for (i = 0; i < dim; i++)
+    {
+        for(j = 0; j < dim; j++){
+            mat[i][j] = 0.0;
+        }
+    }
+}
+
+
+
+int* howmany(int *arr,int dim, int val){
+    int i, *inds, n = 0;
+    inds = (int)malloc(sizeof(int));
+    assert__(inds){
+        printf("An Error Has Occured");
+    }
+    for (i = 0; i < dim; i++){
+        if (arr[i] ==  val)
+        {
+            n++;
+            inds = (int*)realloc(inds, n * sizeof(int));
+            assert__(inds){
+                printf("An Error Has Occured");
+            }
+            inds[n-1] = i;
+        }
+        
+    }
+    return inds;
+}
+
+
+void new_mean(double *new_cent, double **data, int dim, int k, int *classif, int m){
+    int cnt = 0, i, j;
+    double tmp = 0.0;
+    for (i = 0; i < dim; i++)
+    {
+        if(classif[i] == m){
+            cnt++;
+            for (j = 0; j < k; j++)
+            {
+                new_cent[j] += data[i][j];
+                
+            }
+        }
+    }
+    for(j = 0; j < k; j++){
+        tmp = new_cent[j];
+        new_cent[j] = tmp/cnt;
+    }
+}
+
+
+double** kmeans(double **data,int dim, int k, int maxiter){
+    double **centroids,*distances, **new_cents, delta = 0.0;
+    double loss = 0.0, dist = 0.0, newloss =0.0; 
+    int *classification;
+    int i, j,n, *indxs ,inClust = 0;
+
+    classification = (int*)calloc(dim, sizeof(int));
+    assert__(classification){
+        printf("An Error Has Occured");
+    }
+    new_cents = (double**)calloc(k, sizeof(double*));
+    assert__(new_cents){
+        printf("An Error Has Occured");
+    }
+    for(i = 0; i < k; i++){
+        new_cents[i] = (double*)calloc(dim, sizeof(double));
+        assert__(new_cents[i]){
+            printf("An Error Has Occured");
+        }
+    }
+    /* init cents needed !!! */
+    for(i = 0; i < maxiter; i++){
+        for(j = 0; j < dim, j++){
+            distances = (double*)calloc(k, sizeof(double));
+            assert__(distances){
+                printf("An Error Has Occured");
+            }
+            for(n = 0; n < k; n++){
+                dist = calcDistance(centroids[n], data[i], k);
+                distances[n] = dist;
+            }
+            classification[i] = minIndx(distances, k);
+        }
+        zeroes(new_cents, k);
+        for (j = 0; j < k; j++)
+        {
+            new_mean(new_cents[j], data, dim, k, classification, j);
+            delta = fabs(new_cents[j] - centroids[j]);
+        }
+        if(delta == 0.0){
+            return new_cents;
+        }
+    }
+    return NULL;
+
 }
