@@ -144,7 +144,7 @@ void eigsrt(double *ev, double **vec, int n)
         p = ev[i];
         k = i;
         for (j=i+1 ; j<n ; j++)
-        if (ev[j] >= p){ p=ev[j];k = j;}
+        if (ev[j] <= p){ p=ev[j];k = j;}
         if (k != i) {
             ev[k] = ev[i];
             ev[i] = p;
@@ -272,7 +272,7 @@ void transpose(int n, double** mat){
 }
 
 /* performs eigengap heuristic on eigen-vals and returns k*/
-int eigengap(int dim, double** eigenVals){
+int eigengap(int dim, double* eigenVals){
     double *diffs, maxAbs;
     int i, k;
     for (i = 0; i < dim-1; i++)
@@ -444,7 +444,7 @@ void BuildDDG(double** Adj, int dim, double **diag){
         for(j = 0; j <= dim; j++){
             sumline += Adj[i][j];
             if(i != j){
-                diag[i][j] = 0;
+                diag[i][j] = 0.0;
             }
         }
         diag[i][i] = sumline;

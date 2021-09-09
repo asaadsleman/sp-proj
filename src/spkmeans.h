@@ -1,7 +1,7 @@
 void NormalizeU(int dim, int k, double** u);
 void BuildU(int dim, int k, double** jac, double** u);
 void transpose(int n, double** mat);
-int eigengap(int dim, double** eigenVals);
+int eigengap(int dim, double* eigenVals);
 int cmp(const void *x, const void *y);
 double** BuildLap(double** Diag, double** Adj, int dim);
 void eye_minus(int dim, double** mat);
