@@ -29,7 +29,7 @@ def perform(k, objective, data):
         print_matrix(jacobi)
         return
 
-    Wam = spkmeans.WAMatrix(data, data.shape[0])
+    Wam = spkmeans.WAMatrix(data, data.shape[0], data.shape[1])
     if objective == 'wam':
         print_matrix(Wam)
         return

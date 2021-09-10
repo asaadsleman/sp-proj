@@ -11,7 +11,7 @@
 #define assert__(x) for ( ; !(x) ; assert(x) )
 #define MAXLEN 50
 #define MAXITER 300
-#define MAXWID 100
+#define MAXWID 1000
 #define EPS 1e-15
 
 
@@ -238,7 +238,7 @@ int get_feature_num(char* file){
         printf ("An Error Has Occured");
         exit(-1);
     }
-    if(fgets(buffer, MAXWID+1, fp)){
+    if(fgets(buffer, MAXWID, fp)){
         value = strtok(buffer, ",");
         while (value) {
             value = strtok(NULL, ",");
@@ -261,7 +261,7 @@ int get_points_num(char* file){
         exit(-1);
     }
     while(!feof(fp)) {
-        if(fgets(buffer, MAXWID+1, fp)){
+        if(fgets(buffer, MAXWID, fp)){
             row++;
         }
     }
@@ -322,7 +322,7 @@ void transpose(int n, double** mat){
 /* performs eigengap heuristic on eigen-vals and returns k*/
 int eigengap(int dim, double* eigenVals){
     double maxAbs = 0.0;
-    int i, k;
+    int i, k=0;
     for (i = 0; i < dim-1; i++)
     {
         if (fabs(eigenVals[i] - eigenVals[i+1]) > maxAbs)
@@ -534,7 +534,7 @@ void read_csv_file(char *filename, double** data){
         exit(-1);
     }
 
-    while (fgets(buffer, MAXWID + 1, fp)) {
+    while (fgets(buffer, MAXWID, fp)) {
             col = 0;
             row++;
             /* Splitting the data */
