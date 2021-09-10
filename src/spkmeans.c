@@ -18,9 +18,9 @@
 
 
 int main(int argc, char **argv){
-    int dim, cols; /*, k;*/
+    int dim, cols, k;
     char *goal;
-    double **data; /*,, **u, **t, */
+    double **data;
     if(argc < 4){
         printf("not enough parameters");
         return -1;
@@ -32,21 +32,24 @@ int main(int argc, char **argv){
     /* get dims of data*/
     cols = get_feature_num(argv[3]);
     dim = get_points_num(argv[3]);
-    printf("cols: %d dim: %d\n", cols, dim);
     data = (double**)malloc(dim * sizeof(double*));
     assert__(data){
         printf("An Error Has Occured");
     }
     init_data_rows(data, dim, cols);
     read_csv_file(argv[3], data);
-    perform(k, goal, data, dim);
-
+    perform(k, goal, data, dim, cols);
+    free(data);
 	return 0;
 }
 
-void perform(int k, char *goal, double **data, int dim){
-    int i;
-    double **Adjacency, **DiagMat, **laplacian, **jacobi, *ev, **cent;
+/* main Interface for the program,
+does the required goal and is responsible for 
+main operations of memory allocation / deallocation */
+void perform(int k, char *goal, double **data, int dim, int features){
+    int i, j;
+    double **Adjacency, **DiagMat, **laplacian;
+    double **jacobi, *ev, **cent, **u;
     if(strcmp(goal, "jacobi") == 0){  /*jacobi on input matrix only! */
         jacobi = (double**)malloc(dim * sizeof(double*));
         assert(jacobi);
@@ -75,16 +78,19 @@ void perform(int k, char *goal, double **data, int dim){
         }
         printf("\n");
         print_mat(jacobi, dim, dim);
+        free(jacobi);
+        free(ev);
         return;
     }
-    Adjacency = (double**)malloc(dim * sizeof(double*));
+    Adjacency = (double**)calloc(dim , sizeof(double*));
     assert__(Adjacency){
         printf("An Error Has Occured");
     }
     init_data_rows(Adjacency, dim, dim);
-    WAMatrix(data, dim, Adjacency);
+    WAMatrix(data, dim, Adjacency, features);
     if(strcmp(goal, "wam") == 0){
         print_mat(Adjacency, dim, dim);
+        free(Adjacency);
         return;
     }
     DiagMat = (double**)malloc(dim * sizeof(double*));
@@ -95,54 +101,84 @@ void perform(int k, char *goal, double **data, int dim){
     BuildDDG(Adjacency, dim, DiagMat);
     if(strcmp(goal, "ddg") == 0){
         print_mat(DiagMat, dim, dim);
+        free(DiagMat);
+        free(Adjacency);
         return;
     }
     laplacian = BuildLap(DiagMat, Adjacency, dim);
     if(strcmp(goal, "lnorm") == 0){
         print_mat(laplacian, dim, dim);
+        free(Adjacency);
+        free(DiagMat);
+        free(laplacian);
         return;
     }
-    jacobi = (double**)malloc(dim * sizeof(double*));
-    assert__(jacobi){
-        printf("An Error Has Occured");
-    }
-    for (i = 0; i < dim; i++)
+    if (strcmp(goal, "spk") == 0)
     {
-        jacobi[i] = (double*)malloc(dim * sizeof(double));
-        assert__(jacobi[i]){
-            printf("An Error Has Occured");
-        }
-        jacobi[i][i] = 1.0;
+            jacobi = (double**)malloc(dim * sizeof(double*));
+            assert__(jacobi){
+                printf("An Error Has Occured");
+            }
+            for (i = 0; i < dim; i++)
+            {
+                jacobi[i] = (double*)malloc(dim * sizeof(double));
+                assert__(jacobi[i]){
+                    printf("An Error Has Occured");
+                }
+                jacobi[i][i] = 1.0;
+            }
+            free(Adjacency);
+            free(DiagMat);
+            BuildJacobi(dim, laplacian, jacobi);
+            ev = (double*)malloc(dim * sizeof(double)); /* eigen values */
+            assert__(ev){
+                printf("An Error Has Occured");
+            }
+            for (i = 0; i < dim; i++)
+            {
+                ev[i] = laplacian[i][i];
+            }
+            eigsrt(ev, jacobi, dim);
+            free(laplacian);
+            if (k == 0){
+                k = eigengap(dim, ev);
+            }
+            free(ev);
+            u = (double**)malloc(dim * sizeof(double*));
+            assert__(u){
+                printf("An Error Has Occured");
+            }
+            BuildU(dim, k, jacobi, u);
+            free(jacobi);
+            NormalizeU(dim, k, u);
+            cent = (double**)calloc(k, sizeof(double*));
+            assert__(cent){
+                printf("An Error Has Occured");
+            }
+            for (i = 0; i < k; i++)
+            {
+                cent[i] = calloc(k, sizeof(double));
+                assert__(cent[i]){
+                    printf("An Error Has Occured");
+                }
+                for (j = 0; j < k; j++)
+                {
+                    cent[i][j] = u[i][j];
+                }
+            }
+            kmeans(u, cent, dim, k);
+            free(u);
+            print_mat(cent, k,k);
+            free(cent);
     }
-    BuildJacobi(dim, laplacian, jacobi);
-    ev = (double*)malloc(dim*sizeof(double)); /* eigen values */
-    assert__(ev){
-        printf("An Error Has Occured");
+    else{
+        printf("Invalid Input!");
+        return;
     }
-    for (i = 0; i < dim; i++)
-    {
-        ev[i] = laplacian[i][i];
-    }
-    eigsrt(ev, jacobi, dim);
-    transpose(dim, jacobi);
-    if (k == 0){
-        k = eigengap(dim, ev);
-    }
-    u = (double**)malloc(dim * sizeof(double*));
-    assert__(u){
-        printf("An Error Has Occured");
-    }
-    BuildU(dim, k, jacobi, u);
-    NormalizeU(dim, k, u);
-    cent = kmeans(data, dim, k, MAXITER);
-    assert__(cent){
-        printf("An Error Has Occured");
-    }
-    print_mat(cent, k,k);
-
 }
 
-
+/* sort ev (eigenvalues) in ascending order, along with the 
+corresponding eigenvectors in vec columns */
 void eigsrt(double *ev, double **vec, int n)
 {
     int k,j,i;
@@ -164,6 +200,7 @@ void eigsrt(double *ev, double **vec, int n)
     }
 }
 
+/* -convenience method- allocates memory for rows */
 void init_data_rows(double** data, int rows, int cols){
     int i;
     assert(data);
@@ -174,6 +211,7 @@ void init_data_rows(double** data, int rows, int cols){
     }
 }
 
+/* -convenience method- prints matrix in proper form required */
 void print_mat(double** mat, int dim, int cols){
     int i, j;
     for (i = 0; i < dim; i++){
@@ -188,6 +226,7 @@ void print_mat(double** mat, int dim, int cols){
     }
 }
 
+/* calculate num of data columns in csv formatted file */
 int get_feature_num(char* file){
     int col = 0;
     char buffer[MAXWID];
@@ -196,7 +235,7 @@ int get_feature_num(char* file){
 
     fp = fopen (file, "r");
     if (!fp) {
-        fprintf (stderr, "failed to open file for reading\n");
+        printf ("An Error Has Occured");
         exit(-1);
     }
     if(fgets(buffer, MAXWID+1, fp)){
@@ -210,6 +249,7 @@ int get_feature_num(char* file){
     return col;
 }
 
+/* get num of data points in file */
 int get_points_num(char* file){
     int row = 0;
     char buffer[MAXWID];
@@ -217,7 +257,7 @@ int get_points_num(char* file){
 
     fp = fopen (file, "r");
     if (!fp) {
-        fprintf (stderr, "failed to open file for reading\n");
+        printf("An Error Has Occured");
         exit(-1);
     }
     while(!feof(fp)) {
@@ -250,6 +290,7 @@ void NormalizeU(int dim, int k, double** u){
     
 }
 
+/* take first k vectors of jacobi into u */
 void BuildU(int dim, int k, double** jac, double** u){
     int i, j;
     for (i = 0; i < dim; i++)
@@ -280,7 +321,7 @@ void transpose(int n, double** mat){
 
 /* performs eigengap heuristic on eigen-vals and returns k*/
 int eigengap(int dim, double* eigenVals){
-    double *diffs, maxAbs;
+    double maxAbs = 0.0;
     int i, k;
     for (i = 0; i < dim-1; i++)
     {
@@ -290,16 +331,7 @@ int eigengap(int dim, double* eigenVals){
             k = i;
         }
     }
-    return k;
-}
-
-
-int cmp(const void *x, const void *y)
-{
-  double dx = *(double*)x, dy = *(double*)y;
-  if (dx < dy) return -1;
-  if (dx > dy) return  1;
-  return 0;
+    return k+1; /* indexing in heuristic starts at 1 */
 }
 
 /* apply jacobi algorithm as detailed in assignment*/
@@ -315,6 +347,8 @@ void BuildJacobi(int dim, double** mat, double** jacobi){
     }
 }
 
+/* returns array of doubles (for convenience) [max, i, j]
+ where max = A[i][j] is largest off diagonal elem */
 double* offdiag(double** A, int n)
 {
     int i, j;
@@ -339,6 +373,7 @@ double* offdiag(double** A, int n)
     return max;
 }
 
+/* for chosen pivot A[i][j], perform rotation as described in algorithm */
 void Jacobi_rotate ( double **A, double **R, int k, int l, int n )
 {
     int i;
@@ -444,9 +479,7 @@ void multiply_by_Diag(int dim, double** A, double** B){
 void BuildDDG(double** Adj, int dim, double **diag){
     int  i = 0, j;
     double sumline;
-    assert(diag);
     for(i=0; i < dim; i++){
-        assert(diag[i]);
         sumline = 0;
         for(j = 0; j <= dim; j++){
             sumline += Adj[i][j];
@@ -459,18 +492,16 @@ void BuildDDG(double** Adj, int dim, double **diag){
 }
 
 /* fills weighted adjacency matrix according to points in data*/
-void WAMatrix(double** data, int dim, double** adj){
+void WAMatrix(double** data, int dim, double** adj, int features){
     int i = 0, j;
-    assert(adj);
     for(i=0; i < dim; i++){
-        assert(adj[i]);
         for(j = 0; j <= i; j++){
             if (i == j)
             {
                 adj[i][i] = 0;
                 continue;
             }
-            adj[i][j] = CalcWeight(data[i], data[j]);
+            adj[i][j] = CalcWeight(data[i], data[j], features);
             adj[j][i] = adj[i][j];
         }
     }
@@ -478,14 +509,14 @@ void WAMatrix(double** data, int dim, double** adj){
 }
 
 /* calculates weight between 2 given datapoints*/
-double CalcWeight(double* point1, double* point2){
+double CalcWeight(double* point1, double* point2, int features){
     double dis_sq = 0;
-    int i = 0, len;
-    len = sizeof(point1)/sizeof(double);
-    for(i = 0; i < len; i++){
-        dis_sq += sqrt(pow(point1[i] - point2[i], 2));
+    int i = 0;
+    for(i = 0; i < features; i++){
+        dis_sq += pow(point1[i] - point2[i], 2.0);
     }
-    return exp(-dis_sq/2);
+    dis_sq = sqrt(dis_sq);
+    return exp(-dis_sq/2.0);
 }
 
 /* returns a double matrix of data points from filename*/
@@ -499,7 +530,7 @@ void read_csv_file(char *filename, double** data){
 
     fp = fopen (filename, "r");
     if (!fp) {
-        fprintf (stderr, "failed to open file for reading\n");
+        printf("An Error Has Ocurred");
         exit(-1);
     }
 
@@ -523,15 +554,16 @@ double calcDistance(double *point1, double *point2, int dim){
     double dis = 0.0;
     int i;
     for(i = 0; i < dim; i++){
-        dis+= sqrt(pow(fabs(point1[i] - point2[i]),2.0));
+        dis+= pow(point1[i] - point2[i], 2.0);
     }
-    return dis;
+    return sqrt(dis);
+
 }
 
 /* index of minimum element in array of size dim */
 int minIndx(double *arr, int dim){
     int i, j = 0;
-    double max;
+    double min;
     min = *arr;
     for (i = 0; i < dim; i++)
     {
@@ -554,30 +586,7 @@ void zeroes(double **mat, int dim){
     }
 }
 
-
-
-int* howmany(int *arr,int dim, int val){
-    int i, *inds, n = 0;
-    inds = (int)malloc(sizeof(int));
-    assert__(inds){
-        printf("An Error Has Occured");
-    }
-    for (i = 0; i < dim; i++){
-        if (arr[i] ==  val)
-        {
-            n++;
-            inds = (int*)realloc(inds, n * sizeof(int));
-            assert__(inds){
-                printf("An Error Has Occured");
-            }
-            inds[n-1] = i;
-        }
-        
-    }
-    return inds;
-}
-
-
+/* calculate mean for specified cluster */
 void new_mean(double *new_cent, double **data, int dim, int k, int *classif, int m){
     int cnt = 0, i, j;
     double tmp = 0.0;
@@ -598,12 +607,35 @@ void new_mean(double *new_cent, double **data, int dim, int k, int *classif, int
     }
 }
 
+/* update values of oldcents to match newcents (points of length k) */
+void update_cents(double **newcents, double **oldcents, int k){
+    int i, j;
+    for (i = 0; i < k; i++)
+    {
+        for(j = 0; j < k; j++){
+            oldcents[i][j] = newcents[i][j];
+        }
+    }
+}
 
-double** kmeans(double **data,int dim, int k, int maxiter){
-    double **centroids,*distances, **new_cents, delta = 0.0;
-    double loss = 0.0, dist = 0.0, newloss =0.0; 
+/* calculate difference between two centroids of length k */
+double diff(double *p1, double *p2, int k){
+    int i;
+    int diff = 0.0;
+    for (i = 0; i < k; i++)
+    {
+        diff += fabs(p1[i] - p2[i]);
+    }
+    return diff;
+}
+
+/* Given Data Points, calculate and return final centroids after
+ clustering them with KMeans as in HW1 */
+void kmeans(double **data, double **centroids, int dim, int k){
+    double *distances, **new_cents;
+    double dist = 0.0, delta = 0.0; 
     int *classification;
-    int i, j,n, *indxs ,inClust = 0;
+    int i, j,n;
 
     classification = (int*)calloc(dim, sizeof(int));
     assert__(classification){
@@ -614,34 +646,38 @@ double** kmeans(double **data,int dim, int k, int maxiter){
         printf("An Error Has Occured");
     }
     for(i = 0; i < k; i++){
-        new_cents[i] = (double*)calloc(dim, sizeof(double));
+        new_cents[i] = (double*)calloc(k, sizeof(double));
         assert__(new_cents[i]){
             printf("An Error Has Occured");
         }
     }
-    /* init cents needed !!! */
-    for(i = 0; i < maxiter; i++){
-        for(j = 0; j < dim, j++){
-            distances = (double*)calloc(k, sizeof(double));
-            assert__(distances){
-                printf("An Error Has Occured");
-            }
-            for(n = 0; n < k; n++){
-                dist = calcDistance(centroids[n], data[i], k);
+    distances = (double*)calloc(k, sizeof(double));
+    assert__(distances){
+        printf("An Error Has Occured");
+    }
+
+    
+    for(i = 0; i < MAXITER; i++){ /* iterate until MAXITER or convergence */
+        for(j = 0; j < dim; j++){ /* for all elements in data - classify */
+            for(n = 0; n < k; n++){  /* distance from point j to each cluster */
+                dist = calcDistance(centroids[n], data[j], k);
                 distances[n] = dist;
             }
-            classification[i] = minIndx(distances, k);
+            classification[j] = minIndx(distances, k); /* index of cluster point j is closest to */
         }
         zeroes(new_cents, k);
+        delta = 0.0;
         for (j = 0; j < k; j++)
         {
             new_mean(new_cents[j], data, dim, k, classification, j);
-            delta = fabs(new_cents[j] - centroids[j]);
+            delta += diff(new_cents[j], centroids[j], k);
         }
+        update_cents(new_cents, centroids, k);
         if(delta == 0.0){
-            return new_cents;
+            free(new_cents);
+            free(classification);
+            free(distances);
+            return;
         }
     }
-    return NULL;
-
 }

@@ -50,11 +50,11 @@ def perform(k, objective, data):
     u = np.zeros((lap.shape[0], k), np.float64)
     spkmeans.BuildU(jacobi, ev, u, k)
     # Calculate Initial Centroids as in HW2
-    centr_inf = centroids_init(data, k)
+    centr_inf = centroids_init(u, k)
     centr_indx = centr_inf[1]
     centroids = centr_inf[0]
     # Run Classification
-    classifc = kmeans(u, k, centr_indx, centroids)
+    classifc = spkmeans.fit(u, centroids)
     print_matrix(classifc)
 
 
@@ -119,30 +119,28 @@ def kmeans(X, k,I, centroids, max_iter = 300):
     for m in range(0, max_iter):
         # Compute the classifications
         for i in range(0, n_samples):
-            distances = np.zeros(k)
+            distances = np.zeros(k, dtype= np.float64)
             for j in range(0, k):
                 distances[j] = np.sqrt(np.sum(np.power(X[i, :] - centroids[j], 2))) 
         classifications[i] = np.argmin(distances)
+        new_centroids = np.zeros((k, n_features), dtype= np.float64)
+        new_loss = 0
+        for j in range(0, k):
+        # compute centroids
+            J = np.where(classifications == j)
+            X_C = X[J]
+            new_centroids[j] = X_C.mean(axis = 0)
 
-    # Compute the new centroids and new loss
-    new_centroids = np.zeros((k, n_features))
-    new_loss = 0
-    for j in range(0, k):
-      # compute centroids
-      J = np.where(classifications == j)
-      X_C = X[J]
-      new_centroids[j] = X_C.mean(axis = 0)
+        # Compute loss
+            for i in range(0, X_C.shape[0]):
+                new_loss += np.sum(np.power(X_C[i, :] - centroids[j], 2))
 
-      # Compute loss
-      for i in range(0, X_C.shape[0]):
-        new_loss += np.sum(np.power(X_C[i, :] - centroids[j], 2))
-
-    # Stopping criterion            
-    if np.abs(loss - new_loss) == 0:
-      return new_centroids
+        # Stopping criterion            
+            if np.abs(loss - new_loss) == 0:
+                return new_centroids
     
-    centroids = new_centroids
-    loss = new_loss
+        centroids = new_centroids
+        loss = new_loss
 
     print("Failed to converge!")
     return centroids
