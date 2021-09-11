@@ -3,7 +3,6 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/ndarrayobject.h>
 #include <numpy/ndarraytypes.h>
-#include <math.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,20 +10,70 @@
 
 #define assert__(x) for ( ; !(x) ; assert(x) )
 
+/* Util prototypes */
+double** parsePyMatrixToC(PyObject *input, int dim, int features);
+PyObject * parseCMatrixToPy(double **input, int dim, int features);
+
+/* ----------------- UTILITY FUNC - convert py list to c matrix ---------------------- */
+double** parsePyMatrixToC(PyObject *input, int dim, int features){
+    PyObject *line;
+    double **data;
+    int i, j;
+    data = (double**)malloc(dim * sizeof(double*));
+    assert__(data){
+        printf("An Error Has Occured");
+        return NULL;
+    }
+    for (i = 0; i < dim; i++)
+    {
+        line = PyList_GetItem(input, i);
+        data[i] = (double*)malloc(features * sizeof(double));
+        assert__(data[i]){
+            printf("An Error Has Occured");
+            return NULL;
+        }
+        for (j = 0; j < features; j++)
+        {
+            data[i][j] = PyFloat_AsDouble(PyList_GetItem(line, j));
+        }
+    }
+    return data;
+}
+
+/* ----------------- UTILITY FUNC - convert c matrix to py list  ---------------------- */
+PyObject * parseCMatrixToPy(double **input, int dim, int features){
+    PyObject *listoflists, *line;
+    int i, j;
+    listoflists = PyList_New(dim);
+    for (i = 0; i < dim; i++)
+    {
+        line = PyList_New(features);
+        for (j = 0; j < features; j++)
+        {
+            PyList_SetItem(line, j, Py_BuildValue("d", input[i][j]));
+        }
+        PyList_SetItem(listoflists, i, Py_BuildValue("O", line));
+    }
+    return Py_BuildValue("O", listoflists);
+}
+
 
 static PyObject * spkmeans_WAMattrix(PyObject *self, PyObject *args)
 {
-    PyArrayObject *array;
+    PyObject *inputObj, *out;
     double** data;
     double** adj;
-    int dim, features, i, dims[2];
+    int dim, features, i;
 
-    if (!PyArg_ParseTuple(args, "O!ii",&PyArray_Type, &array, &dim, &features)){
+    if (!PyArg_ParseTuple(args, "Oii",&inputObj, &dim, &features)){
         printf("An Error Has Occured");
         Py_INCREF(Py_None);
         return Py_None;
     }
-    data = (double**)PyArray_DATA(array);
+    printf("parsed args\n");
+    data = parsePyMatrixToC(inputObj, dim, features);
+    printf("converted data to C\n");
+    print_mat(data, dim, features);
     adj = (double**)malloc(dim * sizeof(double*));
     assert__(adj){
         free(data);
@@ -32,18 +81,22 @@ static PyObject * spkmeans_WAMattrix(PyObject *self, PyObject *args)
     }
     for (i = 0; i < dim; i++)
     {
-        adj[i] = (double*) calloc(dim, sizeof(double));
+        adj[i] = (double*) malloc(dim * sizeof(double));
         assert__(adj[i]){
             free(data);
             free(adj);
             printf("An Error Has Occured");
         }
     }
-    dims[0] = dim;
-    dims[1] = dims[0];
+    printf("created adj\n");
     WAMatrix(data, dim, adj, features);
+    printf("ran c\n");
+    out = parseCMatrixToPy(adj, dim, dim);
+    printf("Parsed Back");
     free(data);
-    return PyArray_SimpleNewFromData(2,(intptr_t*) dims, NPY_DOUBLE, (void*)adj);
+    free(adj);
+    printf("Returning");
+    return out;
 }
 
 static PyObject * spkmeans_BuildLap(PyObject *self, PyObject *args)
@@ -368,11 +421,11 @@ static struct PyModuleDef moduledef = {
 };
 
 PyMODINIT_FUNC PyInit_spkmeans(void){
-    import_array();
     PyObject *m;
     m = PyModule_Create(&moduledef);
     if(!m){
         return NULL;
     }
+    import_array();
     return m;
 }

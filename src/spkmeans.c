@@ -16,7 +16,6 @@
 
 
 
-
 int main(int argc, char **argv){
     int dim, cols, k;
     char *goal;
