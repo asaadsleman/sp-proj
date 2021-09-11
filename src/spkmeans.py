@@ -28,40 +28,42 @@ def perform(k, objective, data):
         print("\n", end='')
         print_matrix(jacobi)
         return
-
-    Wam = spkmeans.WAMatrix(data, len(data), len(data[0]))
+    dim = len(data)
+    Wam = spkmeans.WAMatrix(data, dim, len(data[0]))
     if objective == 'wam':
         print_matrix(Wam)
         return
-    # ddg = spkmeans.BuildDDG(Wam)
-    # if objective == 'ddg':
-    #     print_matrix(ddg)
-    #     return
-    # lap = spkmeans.BuildLap(ddg, Wam)
-    # if objective == 'lnorm':
-    #     print_matrix(lap)
-    #     return
-    # jacobi = spkmeans.BuildJacobi(lap)
-    # if objective == 'jacobi':
-    #     print(jacobi)
-    #     return
-    # ev = [lap[i][i] for i in range(lap.shape[0])]
-    # # build U and normalize it by row
-    # zeroes = np.zeros((lap.shape[0], k), np.float64)
-    # u = zeroes.tolist()
-    # spkmeans.BuildU(jacobi, ev, u, k)
-    # # Calculate Initial Centroids as in HW2
-    # centr_inf = centroids_init(u, k)
-    # centr_indx = centr_inf[1].tolist()
-    # centroids = centr_inf[0].tolist()
-    # # Run Classification
-    # classifc = spkmeans.fit(u, centroids)
-    # print_matrix(classifc)
+    ddg = spkmeans.BuildDDG(Wam, dim)
+    if objective == 'ddg':
+        print_matrix(ddg)
+        return
+    lap = spkmeans.BuildLap(ddg, Wam, dim)
+    if objective == 'lnorm':
+        print_matrix(lap)
+        return
+    ev = [0.0 for i in range(dim)]
+    jacobi = spkmeans.BuildJacobi(lap, ev, dim)
+    if objective == 'jacobi':
+        print(jacobi)
+        return
+    # build U and normalize it by row
+    u = spkmeans.BuildU(jacobi, ev,dim,  k)
+    # Calculate Initial Centroids as in HW2
+    centr_inf = centroids_init(u, k)
+    centr_indx = centr_inf[1].tolist()
+    centroids = centr_inf[0].tolist()
+    # Run Classification
+    print_array(centr_indx)
+    print("\n", end='')
+    classifc = spkmeans.fit(u, centroids, dim, k)
+    print_matrix(classifc)
 
 
 def print_array(arr):
     for i in range(len(arr)):
         num = arr[i]
+        if abs(num) < 0.0001:
+            num = 0.0
         if(i == (len(arr) - 1)):
             print(f"{num:.4f}", end='')
         else:
@@ -72,6 +74,8 @@ def print_matrix(mat):
     for i in range(len(mat)):
         for j in range(len(mat[0])):
             num = mat[i][j]
+            if abs(num) < 0.0001:
+                num = 0.0
             if(j == (len(mat[0]) -1)):
                 print(f"{num:.4f}", end='')
             else:

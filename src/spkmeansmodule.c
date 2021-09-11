@@ -12,7 +12,26 @@
 
 /* Util prototypes */
 double** parsePyMatrixToC(PyObject *input, int dim, int features);
+double* parsePyArrayToC(PyObject *input, int dim);
 PyObject * parseCMatrixToPy(double **input, int dim, int features);
+PyObject * parseCArrayToPy(double *input, int dim);
+
+/* ----------------- UTILITY FUNC - convert py list to c array ---------------------- */
+double* parsePyArrayToC(PyObject *input, int dim){
+    PyObject *line;
+    double *data;
+    int i;
+    data = (double*)malloc(dim * sizeof(double));
+    assert__(data){
+        printf("An Error Has Occured");
+        return NULL;
+    }
+    for (i = 0; i < dim; i++)
+    {
+        data[i] = PyFloat_AsDouble(PyList_GetItem(input, i));
+    }
+    return data;
+}
 
 /* ----------------- UTILITY FUNC - convert py list to c matrix ---------------------- */
 double** parsePyMatrixToC(PyObject *input, int dim, int features){
@@ -57,6 +76,18 @@ PyObject * parseCMatrixToPy(double **input, int dim, int features){
     return Py_BuildValue("O", listoflists);
 }
 
+/* ----------------- UTILITY FUNC - convert c matrix to py list  ---------------------- */
+PyObject * parseCArrayToPy(double *input, int dim){
+    PyObject *list;
+    int i;
+    list = PyList_New(dim);
+    for (i = 0; i < dim; i++)
+    {
+        PyList_SetItem(list, i, Py_BuildValue("d", input[i]));
+    }
+    return Py_BuildValue("O", list);
+}
+
 
 static PyObject * spkmeans_WAMattrix(PyObject *self, PyObject *args)
 {
@@ -70,10 +101,7 @@ static PyObject * spkmeans_WAMattrix(PyObject *self, PyObject *args)
         Py_INCREF(Py_None);
         return Py_None;
     }
-    printf("parsed args\n");
     data = parsePyMatrixToC(inputObj, dim, features);
-    printf("converted data to C\n");
-    print_mat(data, dim, features);
     adj = (double**)malloc(dim * sizeof(double*));
     assert__(adj){
         free(data);
@@ -88,56 +116,26 @@ static PyObject * spkmeans_WAMattrix(PyObject *self, PyObject *args)
             printf("An Error Has Occured");
         }
     }
-    printf("created adj\n");
     WAMatrix(data, dim, adj, features);
-    printf("ran c\n");
     out = parseCMatrixToPy(adj, dim, dim);
-    printf("Parsed Back");
     free(data);
     free(adj);
-    printf("Returning");
     return out;
 }
 
 static PyObject * spkmeans_BuildLap(PyObject *self, PyObject *args)
 {
-    PyArrayObject *ddg, *wam;
-	double **din, **win, **mout, *a;
-	int i,n,m, dims[2];
+    PyArrayObject *ddg, *wam, *lap;
+	double **din, **win, **mout;
+	int i, dim;
 	/* Parse tuples separately since args will differ between C fcns */
-	if (!PyArg_ParseTuple(args, "O!O!", &PyArray_Type, &ddg, &PyArray_Type, &wam)) {
+	if (!PyArg_ParseTuple(args, "OOi", &ddg, &wam, &dim)) {
         printf("An Error Has Occured");
         Py_INCREF(Py_None);
         return Py_None;
     }
-	if (NULL == ddg || NULL == wam)  {
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    n=dims[0]=PyArray_DIM(wam, 0);
-	m=dims[1]=PyArray_DIM(wam, 1);
-    din=(double**)malloc((size_t) n * sizeof(double));
-    assert__(din){
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    a=(double *) PyArray_DATA(ddg);  /* pointer to matin data as double */
-	for ( i=0; i<n; i++)  {
-		din[i]=a+i*m;  
-    }
-    win=(double**)malloc(n * sizeof(double*));
-    assert__(win){
-        free(din);
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    a=(double *) PyArray_DATA(wam);  /* pointer to matin data as double */
-	for ( i=0; i<n; i++)  {
-		win[i]=a+i*m;  
-    }
+    din=parsePyMatrixToC(ddg);
+    win=parsePyMatrixToC(wam);
     mout=(double**)malloc(n * sizeof(double*));
     assert__(mout){
         free(din);
@@ -148,7 +146,7 @@ static PyObject * spkmeans_BuildLap(PyObject *self, PyObject *args)
     }
 	for ( i=0; i<n; i++)  {
 		mout[i]=malloc(n * sizeof(double));
-        assert__(mout){
+        assert__(mout[i]){
             free(din);
             free(win);
             printf("An Error Has Occured");
@@ -157,163 +155,97 @@ static PyObject * spkmeans_BuildLap(PyObject *self, PyObject *args)
         }
     }
     mout = BuildLap(din, win, n);
-    free((char*) din);
-    free((char*) win);
-    return PyArray_SimpleNewFromData(2, (intptr_t*) dims, NPY_DOUBLE, mout);
+    lap = parseCMatrixToPy(mout, dim, dim);
+    free(din);
+    free(win);
+    free(mout);
+    return lap;
 }
 
 static PyObject * spkmeans_BuildDDG(PyObject *self, PyObject *args)
 {
-    PyArrayObject *matin, *matout;
-	double **cin, **cout, *a;
-	int i,n,m, dims[2];
+    PyArrayObject *wam, *ddg;
+	double **win, **dout;
+	int i,n,m, dim;
 	/* Parse tuples separately since args will differ between C fcns */
-	if (!PyArg_ParseTuple(args, "O!", &PyArray_Type, &matin)) {
+	if (!PyArg_ParseTuple(args, "Oi", &wam, &dim)) {
         printf("An Error Has Occured");
         Py_INCREF(Py_None);
         return Py_None;
     }
-	if (NULL == matin)  {
+    win = parsePyMatrixToC(wam, dim, dim);
+    dout = (double**)malloc(dim * sizeof(double*));
+    assert__(dout){
+        free(win);
         printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
     }
-	n = dims[0] = PyArray_DIM(matin, 0);
-	m = dims[1] = PyArray_DIM(matin, 1);	
-	/* Make a new double matrix of same dims */
-	matout=(PyArrayObject *) PyArray_FromDims(2,dims,NPY_DOUBLE);
-	/* Change contiguous arrays into C ** arrays (Memory is Allocated!) */
-	cin=(double**)malloc((size_t) n * sizeof(double));
-    assert__(cin){
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
+    for (i = 0; i < dim; i++)
+    {
+        dout[i] = (double*) malloc(dim * sizeof(double));
+        assert__(dout[i]){
+            free(win);
+            free(dout);
+            printf("An Error Has Occured");
+        }
     }
-    a=(double *) PyArray_DATA(matin);  /* pointer to matin data as double */
-	for ( i=0; i<n; i++)  {
-		cin[i]=a+i*m;  
-    }
-    cout=(double**)malloc((size_t) n * sizeof(double));
-    assert__(cout){
-        free(cin);
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    a=(double *) PyArray_DATA(matout); 
-	for ( i=0; i<n; i++)  {
-		cout[i]=a+i*m;  
-    }
-    BuildDDG(cin, n, cout);
-    free((char*) cin);
-    free((char*) cout);
-    return PyArray_Return(matout);
+    BuildDDG(win, dim, dout);
+    ddg = parseCMatrixToPy(dout, dim, dim);
+    free(win);
+    free(dout);
+    return ddg;
 }
 
 static PyObject * spkmeans_BuildJacobi(PyObject *self, PyObject *args)
 {
-    int i, n, dims[2];
-    PyArrayObject *ndarray;
-    double **jacobi, **mat, *ev;
+    PyObject *lapin, *evin, *jacout;
+    int i, dim;
+    double **jacobi, **lap;
 
-    if (!PyArg_ParseTuple(args, "iO!", &n, &PyArray_Type , &ndarray)){
+    if (!PyArg_ParseTuple(args, "OOi", &lapin, &evin, &dim)){
         printf("An Error Has Occured");
-        return Py_BuildValue("");
     }
-    jacobi = (double**)malloc(n * sizeof(double*));
+    jacobi = (double**)malloc(dim * sizeof(double*));
     assert__(jacobi){
         printf("An Error Has Occured");
-        return Py_BuildValue("");
     }
     for(i = 0; i < n; i++){
-        jacobi[i] = (double*)calloc(n , sizeof(double));
+        jacobi[i] = (double*)malloc(dim * sizeof(double));
         assert__(jacobi[i]){
             free(jacobi);
             printf("An Error Has Occured");
-            return Py_BuildValue("");
         }
         jacobi[i][i] = 1.0;
     }
-    mat = (double**) PyArray_DATA(ndarray);
-    dims[0] = dims[1] = n;
-    BuildJacobi(n, mat, jacobi);
-    ev = (double*)malloc(n * sizeof(double));
-    assert__(ev){
-        free(jacobi);
-        printf("An Error Has Occured");
-        return Py_BuildValue("");
-    }
+    lap = parsePyMatrixToC(lapin, dim, dim);
+    BuildJacobi(dim, lap, jacobi);
     for (i = 0; i < n; i++)
     {
-        ev[i] = mat[i][i];
+        PyList_SetItem(evin, i, Py_BuildValue("d", lap[i][i]));
     }
-    return  PyArray_SimpleNewFromData(2, (intptr_t*) dims, NPY_FLOAT64, jacobi);
-}
-
-static PyObject * spkmeans_eigengap(PyObject *self, PyObject *args)
-{
-    int dim, k;
-    PyArrayObject *ndarray;
-    double *ev;
-    if (!PyArg_ParseTuple(args, "iO!", &dim, &ndarray)){
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    if(NULL == ndarray){
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    ev = (double*) PyArray_DATA(ndarray);
-    k = eigengap(dim, ev);
-    return Py_BuildValue("i", k);
+    jacout = parseCMatrixToPy(jacobi, dim, dim);
+    free(jacobi);
+    free(lap);
+    return  jacout;
 }
 
 static PyObject * spkmeans_BuildU(PyObject *self, PyObject *args)
 {
-    PyArrayObject *jac, *ev, *u;
+    PyArrayObject *jacin, *evin, *uout;
     double **jacobi, *eigV, **umat;
-    double *a, *a2;
-    int i, n, m=0, k;
+    int i, dim, k;
 
-    if (!PyArg_ParseTuple(args, "O!O!O!i", &PyArray_Type, &jac, &PyArray_Type, &ev, &PyArray_Type, &u, &k)) {
+    if (!PyArg_ParseTuple(args, "OOii", &jacin, &evin, &dim, &k)) {
         printf("An Error Has Occured");
         Py_INCREF(Py_None);
         return Py_None;
     }
-    if (NULL == jac || NULL == ev || NULL == u)  {
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    n = PyArray_DIM(jac, 0);
-    jacobi=(double**)malloc( n * sizeof(double*));
-    assert__(jacobi){
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    a=(double *) PyArray_DATA(jac); 
-	for ( i=0; i<n; i++)  {
-		jacobi[i]=a+i*m;  
-    }
-    eigV=(double*)malloc(n * sizeof(double));
-    assert__(eigV){
-        free(jacobi);
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    a2=(double*) PyArray_DATA(ev);  
-	for ( i=0; i<n; i++)  {
-		eigV[i]= *(a2+i); 
-    }
-    eigsrt(eigV, jacobi, n);
+    jacobi=parsePyMatrixToC(jacin, dim, dim);
+    eigV=parsePyArrayToC(ev, dim);
+    eigsrt(eigV, jacobi, dim);
     if(k == 0){
-        k = eigengap(n, eigV);
+        k = eigengap(dim, eigV);
     }
-    umat = (double**)malloc(n * sizeof(double*));
+    umat = (double**)malloc(dim * sizeof(double*));
     assert__(umat){
         free(jacobi);
         free(eigV);
@@ -321,56 +253,43 @@ static PyObject * spkmeans_BuildU(PyObject *self, PyObject *args)
         Py_INCREF(Py_None);
         return Py_None;
     }
-    a=(double *) PyArray_DATA(u);
-    m = PyArray_DIM(u, 1);  
-	for ( i=0; i<n; i++)  {
-		umat[i]=a+i*m; 
+    for (i = 0; i < dim; i++)
+    {
+        umat[i] = (double*)malloc(k * sizeof(double));
+        assert__(umat[i]){
+            free(jacobi);
+            free(umat);
+            free(eigV);
+            printf("An Error Has Occured");
+            Py_INCREF(Py_None);
+            return Py_None;
+        }
     }
-    BuildU(n, k, jacobi, umat);
-    NormalizeU(n, k, umat);
-    free((char*)jacobi);
-    free((char*)eigV);
-    free((char*)umat);
-    Py_RETURN_NONE;
+    BuildU(dim, k, jacobi, umat);
+    NormalizeU(dim, k, umat);
+    uout = parseCMatrixToPy(umat, dim, k);
+    free(jacobi);
+    free(eigV);
+    free(umat);
+    return uout;
 }
 
 static PyObject * spkmeans_fit(PyObject *self, PyObject *args){
-    PyArrayObject *u, *cent;
-    double **umat, **centmat, *line;
+    PyArrayObject *uin, *centin;
+    double **umat, **centmat;
     int dim, k, i;
-    if(!PyArg_ParseTuple(args, "O!O!ii",&PyArray_Type, &u, &PyArray_Type, &cent)){
+    if(!PyArg_ParseTuple(args, "OOii", &u, &cent, &dim, &k)){
         printf("An Error Has Occured");
         Py_INCREF(Py_None);
         return Py_None;
     }
-    if(NULL == u || NULL == cent){
-        printf("An Error Has Occured");
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    dim = PyArray_DIM(u, 0);
-    k = PyArray_DIM(u, 1);;
-    umat = (double**)malloc(dim * sizeof(double*));
-    assert__(umat){
-        printf("An Error Has Occured");
-    }
-    line = (double*)PyArray_DATA(u);
-    for(i = 0; i < dim; i++){
-        umat[i] = line+i*k;
-    }
-    centmat = (double**) malloc(k  * sizeof(double*));
-    assert__(centmat){
-        free(umat);
-        printf("An Error Has Occured");
-    }
-    line = (double*)PyArray_DATA(cent);
-    for(i = 0; i < k; i++){
-        centmat[i] = line+i*k;
-    }
+    umat = parsePyMatrixToC(uin, dim, k);
+    centmat = parsePyMatrixToC(centin, k, k);
     kmeans(umat, centmat, dim, k);
+    centin = parseCMatrixToPy(centmat, k, k);
     free(umat);
     free(centmat);
-    return PyArray_Return(cent);
+    return centin;
 }
 
 static PyMethodDef spkMethods[] ={
@@ -393,11 +312,6 @@ static PyMethodDef spkMethods[] ={
         (PyCFunction) spkmeans_BuildJacobi,
         METH_VARARGS,
         PyDoc_STR("Jacobi matrix calculated on input matrix")
-    },
-    {"eigengap",
-        (PyCFunction) spkmeans_eigengap,
-        METH_VARARGS,
-        PyDoc_STR("Calculate and applies the eigengap heuristic")
     },
     {"BuildU",
         (PyCFunction) spkmeans_BuildU,
